@@ -1,0 +1,313 @@
+{
+  "224ffb06c3f5": {
+    "instruction": "Navigate to Google and search for Python",
+    "generated_path": "automation_scripts/224ffb06c3f5_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Navigate to Google and search for Python",
+      "description": "Navigate to Google and search for Python",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "fill",
+          "target": "Search input field",
+          "value": "Python",
+          "expected_result": "Search term is entered",
+          "locator_strategy": "placeholder"
+        },
+        {
+          "step_number": 2,
+          "action": "click",
+          "target": "Search button or press Enter",
+          "expected_result": "Search results appear",
+          "locator_strategy": "role"
+        }
+      ]
+    },
+    "has_healed_version": false
+  },
+  "ff2267314861": {
+    "instruction": "Click the submit button",
+    "generated_path": "automation_scripts/ff2267314861_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Click the submit button",
+      "description": "Click the submit button",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "click",
+          "target": "Target element from instruction",
+          "expected_result": "Element is clicked",
+          "locator_strategy": "text"
+        },
+        {
+          "step_number": 2,
+          "action": "execute",
+          "target": "Perform automation task",
+          "expected_result": "Task completes successfully",
+          "locator_strategy": "auto"
+        }
+      ]
+    },
+    "has_healed_version": false
+  },
+  "2ba0c3d9a08c": {
+    "instruction": "Fill form and submit",
+    "generated_path": "automation_scripts/2ba0c3d9a08c_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Fill form and submit",
+      "description": "Fill form and submit",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "fill",
+          "target": "Input field",
+          "value": "value from instruction",
+          "expected_result": "Field is filled",
+          "locator_strategy": "label"
+        },
+        {
+          "step_number": 2,
+          "action": "execute",
+          "target": "Perform automation task",
+          "expected_result": "Task completes successfully",
+          "locator_strategy": "auto"
+        }
+      ]
+    },
+    "has_healed_version": false
+  },
+  "87925f94ffb6": {
+    "instruction": "Navigate to example.com",
+    "generated_path": "automation_scripts/87925f94ffb6_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Navigate to example.com",
+      "description": "Navigate to example.com",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "execute",
+          "target": "Perform automation task",
+          "expected_result": "Task completes successfully",
+          "locator_strategy": "auto"
+        }
+      ]
+    },
+    "has_healed_version": false
+  },
+  "f86a08582d20": {
+    "instruction": "Click the login button",
+    "generated_path": "automation_scripts/f86a08582d20_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Click the login button",
+      "description": "Click the login button",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "fill",
+          "target": "Email or username input field",
+          "value": "user@example.com",
+          "expected_result": "Username is entered",
+          "locator_strategy": "label"
+        },
+        {
+          "step_number": 2,
+          "action": "fill",
+          "target": "Password input field",
+          "value": "password123",
+          "expected_result": "Password is entered",
+          "locator_strategy": "label"
+        },
+        {
+          "step_number": 3,
+          "action": "click",
+          "target": "Login or Sign In button",
+          "expected_result": "User is logged in",
+          "locator_strategy": "role"
+        }
+      ]
+    },
+    "has_healed_version": false
+  },
+  "7f1df7633f43": {
+    "instruction": "Fill in the email field with test@example.com",
+    "generated_path": "automation_scripts/7f1df7633f43_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Fill in the email field with test@example.com",
+      "description": "Fill in the email field with test@example.com",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "fill",
+          "target": "Input field",
+          "value": "value from instruction",
+          "expected_result": "Field is filled",
+          "locator_strategy": "label"
+        },
+        {
+          "step_number": 2,
+          "action": "execute",
+          "target": "Perform automation task",
+          "expected_result": "Task completes successfully",
+          "locator_strategy": "auto"
+        }
+      ]
+    },
+    "has_healed_version": false
+  },
+  "1d142003be46": {
+    "instruction": "Wait for page to load",
+    "generated_path": "automation_scripts/1d142003be46_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Wait for page to load",
+      "description": "Wait for page to load",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "execute",
+          "target": "Perform automation task",
+          "expected_result": "Task completes successfully",
+          "locator_strategy": "auto"
+        }
+      ]
+    },
+    "has_healed_version": false
+  },
+  "324b069faf70": {
+    "instruction": "Login to website with email and password",
+    "generated_path": "automation_scripts/324b069faf70_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Login to website with email and password",
+      "description": "Login to website with email and password",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "fill",
+          "target": "Email or username input field",
+          "value": "user@example.com",
+          "expected_result": "Username is entered",
+          "locator_strategy": "label"
+        },
+        {
+          "step_number": 2,
+          "action": "fill",
+          "target": "Password input field",
+          "value": "password123",
+          "expected_result": "Password is entered",
+          "locator_strategy": "label"
+        },
+        {
+          "step_number": 3,
+          "action": "click",
+          "target": "Login or Sign In button",
+          "expected_result": "User is logged in",
+          "locator_strategy": "role"
+        }
+      ]
+    },
+    "has_healed_version": false
+  },
+  "78a70282f44c": {
+    "instruction": "Navigate to Google",
+    "generated_path": "automation_scripts/78a70282f44c_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Navigate to Google",
+      "description": "Navigate to Google",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "execute",
+          "target": "Perform automation task",
+          "expected_result": "Task completes successfully",
+          "locator_strategy": "auto"
+        }
+      ]
+    },
+    "has_healed_version": false
+  },
+  "53a2468eda4a": {
+    "instruction": "Submit contact form",
+    "generated_path": "automation_scripts/53a2468eda4a_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Submit contact form",
+      "description": "Submit contact form",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "execute",
+          "target": "Perform automation task",
+          "expected_result": "Task completes successfully",
+          "locator_strategy": "auto"
+        }
+      ]
+    },
+    "has_healed_version": false
+  },
+  "9b1c44d362aa": {
+    "instruction": "Fill and submit form",
+    "generated_path": "automation_scripts/9b1c44d362aa_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Fill and submit form",
+      "description": "Fill and submit form",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "fill",
+          "target": "Input field",
+          "value": "value from instruction",
+          "expected_result": "Field is filled",
+          "locator_strategy": "label"
+        },
+        {
+          "step_number": 2,
+          "action": "execute",
+          "target": "Perform automation task",
+          "expected_result": "Task completes successfully",
+          "locator_strategy": "auto"
+        }
+      ]
+    },
+    "has_healed_version": false
+  },
+  "e346af4149af": {
+    "instruction": "Test automation task",
+    "generated_path": "automation_scripts/e346af4149af_generated.py",
+    "healed_path": null,
+    "plan": {
+      "scenario_name": "Test automation task",
+      "description": "Test automation task",
+      "url": null,
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "execute",
+          "target": "Perform automation task",
+          "expected_result": "Task completes successfully",
+          "locator_strategy": "auto"
+        }
+      ]
+    },
+    "has_healed_version": false
+  }
+}

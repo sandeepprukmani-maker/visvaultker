@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Automation Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Automation Dashboard</h1>
+    <p class="page-description">Create browser automations using natural language</p>
+</div>
+
+<div class="top-bar">
+    <button class="btn btn-secondary theme-toggle">
+        <span class="btn-icon"><i data-feather="moon"></i></span>
+        <span>Disconnected</span>
+    </button>
+</div>
+
+<div class="panel">
+    <div class="mode-toggle">
+        <button class="mode-toggle-btn active" id="headless-btn">
+            <span><i data-feather="eye-off"></i></span> Headless
+        </button>
+        <button class="mode-toggle-btn" id="headful-btn">
+            <span><i data-feather="eye"></i></span> Headful
+        </button>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="mode-toggle">
+        <button class="mode-toggle-btn active" id="browser-use-btn">
+            <span><i data-feather="cpu"></i></span> Browser Use
+        </button>
+        <button class="mode-toggle-btn" id="playwright-mcp-btn">
+            <span><i data-feather="code"></i></span> Playwright MCP
+        </button>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Automation Prompt</span>
+    </div>
+    <textarea 
+        id="automation-prompt" 
+        class="textarea-large" 
+        placeholder="Describe your automation task in natural language...
+
+Example: Check my Gmail inbox for unread emails and download them
+Example: Navigate to Amazon and search for wireless headphones
+Example: Go to LinkedIn and extract all job postings for Software Engineer"
+    ></textarea>
+    
+    <button class="execute-btn" id="execute-automation">
+        <span><i data-feather="play"></i></span> Execute Automation
+    </button>
+</div>
+
+<div class="grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-icon"><i data-feather="code"></i></span>
+            <span class="panel-title">Generated Script</span>
+            <span class="badge badge-smart">REUSABLE</span>
+            <button class="btn btn-sm btn-icon" id="copy-playwright-code" style="margin-left: auto; display: none;" title="Copy to clipboard">
+                <i data-feather="copy"></i>
+            </button>
+        </div>
+        <div class="output-panel code-panel" id="generated-script">
+            <div class="empty-state">
+                <div>No script generated yet</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-icon"><i data-feather="refresh-cw"></i></span>
+            <span class="panel-title">Healed Script</span>
+            <span class="badge badge-smart">SMART</span>
+        </div>
+        <div class="output-panel" id="healed-script">
+            <div class="empty-state">
+                <div>No healed script yet</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-icon"><i data-feather="camera"></i></span>
+            <span class="panel-title">Screenshot</span>
+        </div>
+        <div class="output-panel" id="screenshot-panel">
+            <div class="empty-state">
+                <div>No screenshot available</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-icon"><i data-feather="list"></i></span>
+            <span class="panel-title">Execution Logs</span>
+        </div>
+        <div class="output-panel" id="execution-logs">
+            <div class="empty-state">
+                <div>No logs yet</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script>
+    feather.replace();
+</script>
+{% endblock %}
