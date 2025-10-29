@@ -1,3 +1,0 @@
-"""
-Playwright MCP Configuration Module
-"""
