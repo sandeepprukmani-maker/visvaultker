@@ -1,0 +1,80 @@
+Live logs should be streamed and displayed for every step executed within each engine — similar to how a browser shows execution logs — but in real time.
+
+The execution process must automatically fail if a specified verification step is not satisfied.
+
+For example: if the instruction says “Verify the page displays a Logout button” and the button is not found, the step should be marked as failed after proper confirmation.
+
+Screenshots should be captured by default at each step and displayed in the Screenshot Ui add multiple on demand if there is more than one Screenshot if the user has not explicitly provided instructions to take them.
+
+8 minutes ago
+
+Planned screenshot enhancement and validation logic
+I'll help you implement these enhancements for live logging, verification enforcement, and automatic screenshot capture. Let me create a task list:
+
+
+Show 2 more
+
+Planned screenshot implementation steps (4 seconds)
+Good! I can see the infrastructure is mostly in place. Let me examine and enhance the implementation:
+
+
+Show 2 more
+
+Planned screenshot capture strategy (7 seconds)
+Based on my analysis, I can see that:
+
+✅ Live logs streaming - Already working via SSE
+✅ Verification failure detection - Already implemented
+❌ Screenshots per step - Currently only captured at the END
+Let me implement automatic screenshot capture at each step and improve the UI:
+
+
+Review live log streaming process
+
+Show less
+Optimized Agent memory
+
+Decided on screenshot capture mechanism
+
+Opened app/engines/browser_use/engine_optimized.py
+
+Captured screenshot after each step
+Perfect! I can see the issue. Screenshots are only captured after ALL steps complete (line 483). I need to capture screenshots after each step in the loop (lines 420-452). Let me implement this:
+
+
+Edited app/engines/browser_use/engine_optimized.py
+
+Removed final screenshot code
+Now let me remove the old code that captured screenshots only at the end (since we now capture after each step):
+
+
+Edited app/engines/browser_use/engine_optimized.py
+
+Decided on MCP engine updates
+Now let's implement the same for the Playwright MCP engine:
+
+
+Show less
+
+Searched for "Where does the Playwright MCP engine execute steps and how can we capture screenshots after each step?"
+
+Searched for MCP engine's main code
+
+Opened app/engines/playwright_mcp/agent/conversation_agent.py
+
+Decided on screenshot capability inclusion
+
+Executed rg -n --type py 'browser_screenshot|screenshot' app/engines/playwright_mcp | head -n 30
+
+Checked Playwright MCP tool availability
+
+Searched for "What tools are available in the Playwright MCP server? Is there a screenshot tool?"
+
+Planned adding screenshot capability
+Perfect! The Playwright MCP has a browser_snapshot tool. Let me add automatic screenshot capture after each step:
+
+
+Opened app/engines/playwright_mcp/agent/conversation_agent.py
+Checkpoint made
+5 minutes ago
+Add automatic screenshot capture for each execution step
