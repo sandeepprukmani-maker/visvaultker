@@ -1,0 +1,255 @@
+
+
+🚀 PROJECT OVERVIEW
+
+Goal:
+Build a web application that connects to Jira, reads an EPIC and its user stories, uses AI to generate or refine Acceptance Criteria (AC), lets users review them, and uploads updates back to Jira — all with one click.
+
+⸻
+
+🧠 WHY IT’S NEEDED (Purpose of UI Automation)
+
+Product and QA teams waste hours writing or updating acceptance criteria manually.
+Your app automates this using AI + Jira integration, reducing effort and keeping stories consistent with EPICs.
+
+⸻
+
+⚙️ CORE FEATURES
+
+Function	Description
+Fetch EPIC	Fetch EPIC title, description, and related user stories from Jira.
+Generate AC using AI	Read EPIC description → AI generates acceptance criteria in Gherkin or bullet format.
+Update Existing Stories	Match generated ACs to existing user stories and update them automatically.
+Add New Stories	If some ACs don’t match any story → suggest new story creation.
+Manual Edit & Review	Users can review, edit, or reject generated ACs before upload.
+Upload to Jira	Upload selected ACs to one or multiple user stories.
+Partial Update	Update only specific user stories if user chooses.
+Error Handling	Handle cases like invalid EPIC ID, missing description, or permission issues.
+Audit & History	Keep a record of all uploads and updates.
+
+
+⸻
+
+🔄 DETAILED WORKFLOW
+
+1️⃣ Fetch EPIC & Stories
+	•	User enters EPIC ID (like EPIC-123).
+	•	The app connects to Jira’s REST API.
+	•	Fetches:
+	•	EPIC title + description.
+	•	Linked user stories (titles, IDs, descriptions, statuses).
+
+⸻
+
+2️⃣ AI Generation
+	•	If EPIC has a valid description:
+	•	AI analyzes it and generates structured acceptance criteria.
+	•	Example (Gherkin format):
+
+Given a user without an account
+When they proceed to checkout
+Then they can complete the purchase successfully
+
+
+	•	If EPIC has no description → show an error:
+“EPIC has no description or is invalid.”
+
+⸻
+
+3️⃣ Updating Existing Stories (Key Functionality)
+	1.	AI-generated ACs are compared with existing user story titles and descriptions.
+	2.	For each generated AC, the app finds which story it belongs to (semantic matching).
+	3.	If match found → update that story’s AC section.
+	4.	You can preview all updates before uploading to Jira.
+	5.	The app then sends the new ACs to Jira (PATCH request).
+
+✅ Example:
+
+Story ID	Story Title	Updated With
+STORY-102	Guest Checkout	Guest checkout ACs
+STORY-103	Address Validation	Address validation ACs
+
+
+⸻
+
+4️⃣ Adding New Stories
+	•	If some ACs don’t match existing stories:
+	•	App suggests creating new user stories.
+	•	You can review & confirm before they’re added to Jira.
+
+⸻
+
+5️⃣ Modify Before Upload
+	•	In the UI, users can:
+	•	Edit generated ACs inline.
+	•	Add or remove items.
+	•	Choose which stories to update.
+	•	Preview all Jira updates in a “diff” view (before/after text).
+
+⸻
+
+6️⃣ Upload to Jira
+	•	Upload options:
+	•	Single story update: Update one user story’s acceptance criteria.
+	•	Bulk update: Update all selected stories at once.
+	•	Uses Jira’s REST API (PATCH /issue/{id}).
+	•	Logs all changes in an audit table.
+
+⸻
+
+7️⃣ Error Handling
+	•	Invalid EPIC ID → Show “Invalid input. Please check EPIC/User Story ID.”
+	•	Missing description → “EPIC has no description or is invalid.”
+	•	Jira API failure → Retry automatically, else show user-friendly error.
+
+⸻
+
+🧩 ARCHITECTURE OVERVIEW
+
+User → Web UI → Backend API → {AI Engine, Jira API, Database}
+
+🖥️ Frontend
+	•	Framework: React / Next.js
+	•	Pages:
+	•	Login / Connect Jira
+	•	EPIC Dashboard (list EPICs)
+	•	Review & Edit AC
+	•	Audit Log
+	•	Settings (model, Jira credentials)
+
+⚙️ Backend
+	•	Framework: Node.js (Express) or Python (FastAPI)
+	•	Responsibilities:
+	•	Handle Jira API integration
+	•	Handle AI requests (prompt + response)
+	•	Manage user sessions
+	•	Store data (ACs, audits, mappings)
+	•	Expose REST APIs to frontend
+
+🧠 AI Layer
+	•	Uses LLM (like OpenAI GPT-5)
+	•	Tasks:
+	•	Read EPIC description
+	•	Generate acceptance criteria
+	•	Match criteria to existing stories
+	•	Optional: Rephrase or summarize criteria
+
+🗄️ Database
+	•	PostgreSQL
+	•	Tables:
+	•	users → user info, Jira tokens
+	•	epics → EPIC metadata
+	•	stories → existing story info
+	•	generated_ac → AI-generated acceptance criteria
+	•	audit_logs → who updated what and when
+
+⸻
+
+🧮 PROMPT EXAMPLE (for AI)
+
+You are an AI that extracts and writes acceptance criteria from EPICs.
+
+Input:
+EPIC: Improve Checkout Flow
+Description: Allow guest checkout and address validation during checkout.
+
+Output Format (JSON):
+[
+  {
+    "story_title": "Guest Checkout",
+    "criteria": [
+      "Given a user without an account, when they checkout, then they can complete the purchase."
+    ]
+  },
+  {
+    "story_title": "Address Validation",
+    "criteria": [
+      "Given a user enters an invalid address, then the system shows an error message."
+    ]
+  }
+]
+
+
+⸻
+
+🧮 DATA MODEL (Simplified)
+
+Table	Key Columns	Purpose
+users	id, email, jira_token	Auth & settings
+epics	id, jira_epic_id, title, desc	Stores EPIC info
+stories	id, jira_story_id, epic_id, title, desc	Tracks existing user stories
+generated_ac	id, epic_id, story_id, ac_text, format	AI-generated ACs
+audit_logs	id, user_id, epic_id, story_id, before_text, after_text, timestamp	Keeps update history
+
+
+⸻
+
+🧠 ERROR SCENARIOS
+
+Case	Message
+EPIC not found	“Invalid EPIC ID”
+EPIC has no description	“EPIC has no description or is invalid.”
+Jira API fails	“Unable to connect to Jira. Please try again.”
+User cancels update	“Update cancelled.”
+
+
+⸻
+
+🔐 SECURITY
+	•	Jira API tokens stored encrypted.
+	•	Role-based access (Admin / User).
+	•	HTTPS enforced.
+	•	Audit logs for all Jira updates.
+
+⸻
+
+🧰 TECH STACK
+
+Layer	Recommended Tool
+Frontend	React / Next.js
+Backend	Node.js (Express) / Python (FastAPI)
+Database	PostgreSQL
+AI Model	OpenAI GPT-5 API (for AC generation)
+Authentication	OAuth2 (Jira) + JWT
+Hosting	AWS / Vercel / Render
+Logging	ELK Stack or Datadog
+
+
+⸻
+
+📅 DEVELOPMENT ROADMAP (Milestones)
+
+Milestone	Goal
+1. Jira Connection	Connect app to Jira, fetch EPIC & stories
+2. AI Integration	Generate AC from EPIC description
+3. Matching Logic	Map generated ACs → existing stories
+4. Edit & Review UI	Build UI to modify and preview before upload
+5. Upload to Jira	Update stories via Jira API (single & bulk)
+6. Error & Audit System	Add validations, logs, rollback
+7. Polish & Deploy	Add settings, optimize UI, deploy to production
+
+
+⸻
+
+🧠 SCENARIOS (from your image – finalized)
+	1.	EPIC with description but no user stories → Generate and display AC.
+	2.	EPIC with no description and no user stories → Show error message.
+	3.	Updating existing user stories → Replace their ACs using new AI output.
+	4.	Adding and updating stories → Update existing + create new if needed.
+	5.	Updating a single user story → Edit and upload one story’s AC.
+	6.	Uploading updates for a single story → Push one update to Jira.
+	7.	Uploading updates for multiple stories → Push all updates in one go.
+	8.	Modifying AC before upload → Edit AC manually in the UI.
+	9.	Partial updates → Choose specific stories to update.
+	10.	Invalid input handling → Error message for bad EPIC ID or missing data.
+
+⸻
+
+✅ OUTCOME
+
+After this system is ready:
+	•	You can take any EPIC from Jira.
+	•	The AI generates all acceptance criteria.
+	•	You review and confirm.
+	•	The system automatically updates or creates stories with those criteria.
+	•	Everything syncs to Jira instantly — clean, auditable, and consistent.
