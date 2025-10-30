@@ -1,0 +1,77 @@
+*new 3 - Notepad+ +
+Edit
+Search
+View
+Encoding
+Language
+Settings
+Tools
+Macro
+
+Run
+all
+VM-CO.../
+-
+ロ
+TextFX
+Plugins
+Window
+
+
+new3 ★ 83
+UYO ICEChat file, 1.txt
+пртігс
+bbg_s3 loader_sai.log
+[httpx]
+INFO: HTTP Request:
+run-bbg-s3-loader.ps1
+lew 1
+new.2
+POST https://porf-apigw-int.saifg.rbc.com/JLC0/11m-control-stack/v1/chat/complotions *HTTP/1.1 200 oK"
+(app.ongines.playwright_mcp.agent.conversation_agont] INFO: Step 1: Navigate to https://www.google.com/search2g=dogs
+[httpx]
+INFO:
+HTTP Roquest: POST https://perf-apigw-int.saifg.rbc.com/JLC0/11m-control-stack/v1/chat/completions "HTTP/1.1 200 OK"
+[app.engines.playwright_mcp.agent.conversation_agent] INFO:
+Tapp.onginos-playwright_mcp.agent.conversation_agent] INFO: Exocution Completed Successfully (app.ongines.playwright_mcp.agent.conversation_ agent]
+INFO: Total Steps: 1
+(app.ongines.playwright_mcp.agent.conversation_agent] INFO:
+05:24
+6:05:24
+(app.ongines.playwright_mcp.agont.conversation_agent]
+INFO: O Starting Python code generation with three-agent workflow...
+2025-10-29
+(app.ongines.playwright_mcp.agent.convergation_agont] INFO: & Stop 1/2: Running Planner Agent.
+16:05:24 (app.onginos.playwright_mcp.agents.planner_agent] INFO: & Planner Agen
+Creating plan
+for 'open goofgle search for dogs.'
+2025-10-29
+athttps://www.google.com/search?g=dogs
+Traceback (most recent
+16:05:24 (app.engines.playwright_mcp.agents.planner_agent] ERROR: X Planner Ageent error: 'OpenAI' object has no attribute 'messages'
+File
+call last):
+"C: \Users\sanponnu\PycharmProjects\gingor_v1\app\engines\playwright_mcp\agents\planner_agent.py", line 102, in create_ plan
+rosponse a solf. lim_client.messages: croate‹
+^^へへへへへへへへへへへへへへへへへへへへへ
+AttributeError:
+'OpenAI' object has no attributo 'messages'
+2025-10-29 16:05:24 [app.ongines.playwright_mcp.agent.conversation_agent] ERROR: X Python code generation failed: 'OpenAI' object has no attribute 'messages'
+Traceback (most recont call last) :
+File
+plan_result = self. planner
+*E sep Rych apro-ectato ngor V2 \applongines\playwright_meplagent\conversation _agent.py", Lino 662, in generato python code from oxecution
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Filo "C: \Usors\sanponnu\PycharmProjects\gingor_v1\app\ongies\playwright_mcp\agents\planner_agent.py", lino 102, in croate_plan
+responso = self. 1lm_client.messages.create (
+へへへへへへへへへへへへへへへへへへへへへへへへ
+AttributeError: 'OponAI' object has no attribute 'messages'
+2025-10-29 16:05:24
+[app. routes.api] INFO: @ Saved generated Python script (hash: b0c6dbd4... ›
+2025-10-29 16:05:24
+2025-10-29 16:05:24
+[app.routes.api] INFO:, g
+Saved execution to history (ID: 3)
+2025-10-29 16:05:24
+[app.routes.api] INFO: @ Streaming completed successfully
+(app. routes.api] INFO:
