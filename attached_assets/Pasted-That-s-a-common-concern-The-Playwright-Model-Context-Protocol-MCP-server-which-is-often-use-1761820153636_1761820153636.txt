@@ -1,0 +1,40 @@
+That's a common concern\! The **Playwright Model Context Protocol (MCP)** server, which is often used for AI-driven or remote automation, can sometimes introduce performance overhead. However, in many cases, performance issues relate to general Playwright best practices.
+
+Here are the most effective strategies to significantly speed up your Playwright/MCP execution:
+
+## ⚡️ Optimize Execution Environment
+
+  * **Use Headless Mode:** Running the browser in **headless mode** (without a visible UI) is significantly faster, as it skips the rendering overhead. This is the default for CI/CD environments.
+      * *If you are using the MCP server, you can usually start it with a `--headless` flag.*
+  * **Run Tests in Parallel (Parallelization):** This is the **single biggest speed-up** for large test suites. Configure Playwright to use multiple workers to execute tests concurrently.
+    ```bash
+    npx playwright test --workers=4
+    ```
+      * *You can also set this in your `playwright.config.ts` file using the `workers` and `fullyParallel` options.*
+  * **Reuse Authentication State:** Avoid repeating the slow login process in every single test.
+      * Log in once, save the authentication state (`storageState`), and load it into new browser contexts for subsequent tests. This lets you skip the UI login flow.
+  * **Isolate Tests with Contexts, Not Browsers:** Starting a new **browser** instance for every test is slow. Instead, reuse the browser process and create a fresh **browser context** for each test to ensure isolation of cookies, local storage, and cache.
+
+-----
+
+## 💻 Refine Your Test Code
+
+  * **Avoid Hardcoded Delays (`waitForTimeout`):** Static waits are the \#1 cause of slow tests. Playwright has **Auto-Waiting** capabilities—it automatically waits for an element to be visible, enabled, and ready before interacting with it. Rely on Playwright's default behavior and use explicit waits only when necessary.
+      * **Bad:** `await page.waitForTimeout(3000);`
+      * **Good:** `await page.click('button#submit');` (Playwright automatically waits for the button to be ready).
+  * **Optimize Selectors (Locators):** Use efficient and stable locators. Playwright's **role-based locators** (e.g., `getByRole`, `getByLabel`) and `data-testid` attributes are faster and less brittle than complex or full XPath selectors.
+      * **Less Efficient:** `await page.locator('//div[2]/span[3]').click();`
+      * **More Efficient:** `await page.getByRole('button', { name: 'Submit' }).click();`
+  * **Network Mocking/Stubbing:** For tests that don't need to validate real external API calls, use **Network Interception** (`page.route`) to mock or stub responses. This eliminates real network latency and makes tests deterministic.
+
+-----
+
+## 🛠 MCP-Specific Considerations
+
+If the slowness is specifically within the **MCP server environment** (e.g., when integrating with an AI agent in an IDE like VS Code/Copilot):
+
+  * **Check Environment/WSL2:** If you are running the MCP server or Playwright on **WSL2** (Windows Subsystem for Linux), there can be significant I/O performance overhead. Consider moving your Playwright setup to a **native Windows or Linux installation** for better performance.
+  * **Limit Connections:** If you are using the MCP server to share a single browser instance among multiple clients, ensure you are not overwhelming it with too many concurrent connections, which can strain system resources.
+  * **System Resources:** The MCP server, especially when used in "headful" mode or with AI tooling, can be resource-intensive. Ensure your machine has **ample CPU cores and RAM**.
+
+Would you like me to elaborate on setting up **parallel execution** or **reusing authentication state** in your Playwright configuration?
