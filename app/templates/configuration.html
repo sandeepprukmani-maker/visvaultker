@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Configuration</h1>
+    <p class="page-description">Set up your local agent and configure automation settings</p>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Automation Engine</span>
+    </div>
+    <div style="margin-bottom: 16px;">
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+            Choose which automation engine to use for running browser tasks
+        </p>
+        <div class="mode-toggle">
+            <button class="mode-toggle-btn active" id="browser-use-btn">
+                <span><i data-feather="cpu"></i></span> Browser Use
+            </button>
+            <button class="mode-toggle-btn" id="playwright-mcp-btn">
+                <span><i data-feather="code"></i></span> Playwright MCP
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Browser Mode</span>
+    </div>
+    <div style="margin-bottom: 16px;">
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+            Choose whether to run browser in visible mode (headful) or hidden mode (headless)
+        </p>
+        <div class="mode-toggle">
+            <button class="mode-toggle-btn" id="headless-btn">
+                <span><i data-feather="eye-off"></i></span> Headless
+            </button>
+            <button class="mode-toggle-btn active" id="headful-btn">
+                <span><i data-feather="eye"></i></span> Headful
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">System Information</span>
+    </div>
+    <div class="info-grid">
+        <div class="info-item">
+            <div class="info-label">Operating System</div>
+            <div class="info-value" id="client-os">Detecting...</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Browser</div>
+            <div class="info-value" id="client-browser">Detecting...</div>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Local Agent Setup</span>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+        <h4 style="color: var(--primary-purple); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <span><i data-feather="info"></i></span> About Local Agent
+        </h4>
+        <p style="color: var(--text-secondary); line-height: 1.6; font-size: 0.95rem;">
+            The local agent allows you to run browser automations in headful mode on your machine. It connects to this server and executes tests with a visible browser window, perfect for debugging and development.
+        </p>
+    </div>
+    
+    <div style="margin-bottom: 24px;">
+        <h4 style="color: var(--text-primary); margin-bottom: 12px;">Download Agent for Your System</h4>
+        <button class="btn btn-primary">
+            <span class="btn-icon"><i data-feather="download"></i></span>
+            Download Local Agent (Python Script)
+        </button>
+    </div>
+    
+    <div style="margin-bottom: 24px;">
+        <h4 style="color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <span><i data-feather="clipboard"></i></span> Setup Instructions
+        </h4>
+        <ol style="color: var(--text-secondary); line-height: 1.8; padding-left: 20px;">
+            <li>Download the agent script using the button above</li>
+            <li style="margin-top: 8px;">Ensure Python 3.7+ is installed on your system</li>
+            <li style="margin-top: 8px;">Install required packages: 
+                <div class="code-block" style="margin-top: 8px;">pip install playwright python-socketio websocket-client</div>
+            </li>
+            <li style="margin-top: 8px;">Install Playwright browsers: 
+                <div class="code-block" style="margin-top: 8px;">playwright install</div>
+            </li>
+            <li style="margin-top: 8px;">Set the server URL environment variable:
+                <div class="code-block" style="margin-top: 8px;">set AGENT_SERVER_URL=http://127.0.0.1:5000</div>
+            </li>
+        </ol>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/configuration.js') }}"></script>
+<script>
+    feather.replace();
+</script>
+{% endblock %}
