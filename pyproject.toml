@@ -1,0 +1,22 @@
+[project]
+name = "repl-nix-workspace"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.72.0",
+    "cryptography>=44.0.0",
+    "fastapi>=0.121.0",
+    "google-generativeai>=0.8.5",
+    "openai>=2.7.1",
+    "playwright>=1.55.0",
+    "psycopg2-binary>=2.9.11",
+    "pydantic>=2.12.3",
+    "pydantic-settings>=2.11.0",
+    "python-dotenv>=1.2.1",
+    "python-multipart>=0.0.20",
+    "pyyaml>=6.0.3",
+    "sqlalchemy>=2.0.44",
+    "uvicorn>=0.38.0",
+    "websockets>=15.0.1",
+]
