@@ -1,3 +1,0 @@
-"""
-Browser-Use Configuration Module
-"""
