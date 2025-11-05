@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Site Crawler - VisionVault{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <h1>🕷️ Site Crawler & Knowledge Base</h1>
+    <p>Learn website structures and use knowledge for intelligent automation</p>
+</div>
+
+<!-- Create New Crawl Section -->
+<div class="card">
+    <div class="card-header">
+        <h2>➕ Create New Crawl</h2>
+    </div>
+    <div class="card-body">
+        <form id="createCrawlForm">
+            <div class="form-group">
+                <label for="crawlName">Crawl Name</label>
+                <input type="text" id="crawlName" name="name" placeholder="My Website Crawl" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="startUrl">Start URL</label>
+                <input type="url" id="startUrl" name="start_url" placeholder="https://example.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="credentialId">Credentials (Optional)</label>
+                <select id="credentialId" name="credential_id">
+                    <option value="">None - Public site</option>
+                </select>
+                <small>If the site requires login, select credentials to use</small>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="maxPages">Max Pages</label>
+                    <input type="number" id="maxPages" name="max_pages" value="50" min="1" max="500" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="maxDepth">Max Depth</label>
+                    <input type="number" id="maxDepth" name="max_depth" value="3" min="1" max="10" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="sameDomain" name="same_domain_only" checked>
+                    <span>Same domain only</span>
+                </label>
+            </div>
+            
+            <div class="button-group">
+                <button type="submit" class="btn btn-primary">
+                    <span class="btn-icon">🕷️</span>
+                    Create & Start Crawl
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Crawls List Section -->
+<div class="card">
+    <div class="card-header">
+        <h2>📚 My Crawls</h2>
+        <button class="btn btn-secondary btn-sm" onclick="loadCrawls()">
+            <span class="btn-icon">🔄</span>
+            Refresh
+        </button>
+    </div>
+    <div class="card-body">
+        <div id="crawlsList">
+            <p class="text-muted">Loading crawls...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Knowledge Viewer Modal (hidden by default) -->
+<div id="knowledgeModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>🧠 Site Knowledge</h2>
+            <button class="close" onclick="closeKnowledgeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <pre id="knowledgeContent"></pre>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin-right: 0.5rem;
+}
+
+.button-group {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.crawl-item {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: var(--bg-secondary);
+}
+
+.crawl-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.crawl-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.crawl-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-completed { background: #10b98120; color: #10b981; }
+.status-running { background: #3b82f620; color: #3b82f6; }
+.status-failed { background: #ef444420; color: #ef4444; }
+.status-pending { background: #f59e0b20; color: #f59e0b; }
+
+.crawl-meta {
+    display: flex;
+    gap: 1.5rem;
+    margin: 0.5rem 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.crawl-url {
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    word-break: break-all;
+}
+
+.crawl-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    max-width: 900px;
+    width: 90%;
+    max-height: 80%;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.close {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    line-height: 1;
+}
+
+.close:hover {
+    color: var(--text-primary);
+}
+
+#knowledgeContent {
+    background: var(--bg-secondary);
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.progress-bar {
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--primary);
+    transition: width 0.3s ease;
+}
+</style>
+
+<script src="/static/js/crawler.js"></script>
+{% endblock %}
