@@ -5,7 +5,7 @@ integrations = ["python_anthropic:1.0.0", "python_openai:1.0.0", "python_gemini:
 
 [nix]
 channel = "stable-25_05"
-packages = ["gitFull", "playwright-driver", "xorg.libxcb", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXfixes", "mesa", "cups", "nspr", "nss", "dbus", "at-spi2-core", "pango", "cairo", "alsa-lib"]
+packages = ["gitFull", "playwright-driver", "xorg.libxcb", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXfixes", "mesa", "cups", "nspr", "nss", "dbus", "at-spi2-core", "pango", "cairo", "alsa-lib", "libxkbcommon"]
 
 [workflows]
 runButton = "Project"

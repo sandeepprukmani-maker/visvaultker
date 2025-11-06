@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import Literal
 
 ModelType = Literal["claude", "gpt4o", "gemini"]
@@ -25,8 +26,8 @@ MODEL_CONFIGS = {
     }
 }
 
-MCP_SERVER_COMMAND = "npx"
-MCP_SERVER_ARGS = ["@playwright/mcp"]
+MCP_SERVER_COMMAND = "npx.cmd" if sys.platform == "win32" else "npx"
+MCP_SERVER_ARGS = ["@playwright/mcp", "--headed"]
 
 OUTPUT_DIR = "generated_scripts"
 TRACE_DIR = "traces"
@@ -51,30 +52,50 @@ Describe each action clearly as you perform it."""
 
 CODE_GENERATOR_SYSTEM_PROMPT = """You are a Python code generation expert. Convert browser automation execution traces into clean, reusable Playwright Python scripts.
 
-Requirements:
-1. Use async/await patterns properly
-2. Prioritize intelligent locators in this order:
-   - page.get_by_role()
-   - page.get_by_label()
-   - page.get_by_placeholder()
-   - page.get_by_test_id()
-   - page.locator() (CSS) only as last resort
-3. Include proper imports
-4. Use descriptive variable names
-5. Add comments for clarity
-6. Create a single, executable Python function
-7. Handle errors gracefully
-8. Structure code cleanly with proper spacing
+CRITICAL LOCATOR REQUIREMENTS:
+1. ALWAYS use semantic locators in this EXACT priority order:
+   a) page.get_by_role("button", name="Click Me") - for buttons, links, headings, textboxes
+   b) page.get_by_label("Email") - for form inputs with labels
+   c) page.get_by_placeholder("Enter email") - for inputs with placeholders
+   d) page.get_by_text("Exact Text") - for unique text content
+   e) page.get_by_test_id("submit-btn") - if test IDs are present
+   f) page.locator("css") - ONLY as absolute last resort
+
+2. NEVER use generic CSS selectors like ".class" or "#id" without trying semantic locators first
+
+3. Add explicit waits for elements:
+   - await page.wait_for_selector() when needed
+   - Use expect(locator).to_be_visible() for verification
+
+4. Structure:
+   - Proper async/await patterns
+   - All necessary imports
+   - Error handling with try/except
+   - Descriptive variable names
+   - Comments explaining each step
 
 Generate ONLY the Python code, no explanations."""
 
-HEALER_SYSTEM_PROMPT = """You are a code debugging expert. Analyze failed Playwright scripts and trace files to fix broken locators.
+HEALER_SYSTEM_PROMPT = """You are a code debugging expert. Analyze failed Playwright scripts and fix broken locators.
 
-When healing:
-1. Identify why the original locator failed from the trace
-2. Suggest better, more robust locators
-3. Use accessible selectors (role, label, placeholder) over CSS
-4. Consider dynamic content and timing issues
-5. Output the fixed Python code
+CRITICAL HEALING RULES:
+1. Identify the EXACT error cause from the error message
+2. Replace fragile locators with robust semantic locators:
+   - Use get_by_role() for buttons, links, headings
+   - Use get_by_label() for form inputs
+   - Use get_by_text() for unique text
+   - AVOID CSS selectors unless absolutely necessary
 
-Generate ONLY the fixed Python code, no explanations."""
+3. Add proper waits:
+   - await page.wait_for_load_state("networkidle")
+   - await expect(locator).to_be_visible()
+   - await page.wait_for_selector() for dynamic content
+
+4. Add error handling with try/except blocks
+
+5. Common fixes:
+   - Timeout errors → Add waits
+   - Element not found → Use semantic locators
+   - Click intercepted → Wait for element to be visible and enabled
+
+Generate ONLY the fixed Python code with ALL improvements applied, no explanations."""

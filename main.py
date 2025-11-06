@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
 
-from config import MODEL_CONFIGS, ModelType, MCP_SERVER_COMMAND, MCP_SERVER_ARGS, OUTPUT_DIR, TRACE_DIR
+from config import MODEL_CONFIGS, ModelType, MCP_SERVER_COMMAND, MCP_SERVER_ARGS, OUTPUT_DIR, TRACE_DIR, MAX_HEALING_ATTEMPTS
 from mcp_client import PlaywrightMCPClient
 from agents import ExecutorAgent, CodeGeneratorAgent, HealerAgent
 
@@ -110,18 +110,44 @@ async def main():
                     console.print(f"[bold red]✗ Generated script failed with error:[/bold red]\n{error_message}")
                     
                     healer = HealerAgent(model)
-                    console.print("\n[yellow]Attempting to auto-heal the script...[/yellow]")
+                    current_code = generated_code
+                    max_attempts = MAX_HEALING_ATTEMPTS
                     
-                    healed_code = await healer.heal_code(generated_code, error_message)
-                    
-                    healed_output = output_file.replace(".py", "_healed.py")
-                    with open(healed_output, "w") as f:
-                        f.write(healed_code)
-                    
-                    console.print(f"\n[bold green]✓ Healed script saved to: {healed_output}[/bold green]\n")
-                    
-                    syntax = Syntax(healed_code, "python", theme="monokai", line_numbers=True)
-                    console.print(Panel(syntax, title="Healed Code", border_style="green"))
+                    for attempt in range(1, max_attempts + 1):
+                        console.print(f"\n[yellow]Healing attempt {attempt}/{max_attempts}...[/yellow]")
+                        
+                        healed_code = await healer.heal_code(current_code, error_message)
+                        
+                        healed_output = output_file.replace(".py", f"_healed_v{attempt}.py")
+                        with open(healed_output, "w") as f:
+                            f.write(healed_code)
+                        
+                        console.print(f"[blue]Healed script saved to: {healed_output}[/blue]")
+                        console.print(f"[yellow]Testing healed script (attempt {attempt})...[/yellow]")
+                        
+                        proc = await asyncio.create_subprocess_exec(
+                            sys.executable, healed_output,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE
+                        )
+                        
+                        stdout, stderr = await proc.communicate()
+                        
+                        if proc.returncode == 0:
+                            console.print(f"\n[bold green]✓ Healed script executed successfully on attempt {attempt}![/bold green]\n")
+                            syntax = Syntax(healed_code, "python", theme="monokai", line_numbers=True)
+                            console.print(Panel(syntax, title=f"Healed Code (v{attempt}) - WORKING", border_style="green"))
+                            break
+                        else:
+                            error_message = stderr.decode() if stderr else "Unknown error"
+                            console.print(f"[red]✗ Healed script still failed:[/red]\n{error_message[:500]}...")
+                            current_code = healed_code
+                            
+                            if attempt == max_attempts:
+                                console.print(f"\n[bold red]✗ Failed to heal script after {max_attempts} attempts[/bold red]")
+                                console.print(f"[yellow]Last healed version saved to: {healed_output}[/yellow]")
+                                syntax = Syntax(healed_code, "python", theme="monokai", line_numbers=True)
+                                console.print(Panel(syntax, title=f"Healed Code (v{attempt}) - Still Failed", border_style="red"))
                 else:
                     console.print("[bold green]✓ Generated script executed successfully![/bold green]")
             
