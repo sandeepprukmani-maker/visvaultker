@@ -1,0 +1,31 @@
+modules = ["python-3.11", "nodejs-20"]
+[agent]
+expertMode = true
+integrations = ["python_anthropic:1.0.0", "python_openai:1.0.0", "python_gemini:1.0.0"]
+
+[nix]
+channel = "stable-25_05"
+packages = ["alsa-lib", "at-spi2-core", "cairo", "cups", "dbus", "gitFull", "libxkbcommon", "mesa", "nspr", "nss", "pango", "playwright-driver", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXfixes", "xorg.libxcb", "libgbm"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "cli-tool"
+
+[[workflows.workflow]]
+name = "cli-tool"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "echo \"Playwright MCP Script Generator is ready! Run with: python main.py 'your task description'\""

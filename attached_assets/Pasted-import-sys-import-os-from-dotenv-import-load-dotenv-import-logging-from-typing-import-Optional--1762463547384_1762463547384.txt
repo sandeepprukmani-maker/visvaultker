@@ -1,0 +1,76 @@
+import sys
+import os
+from dotenv import load_dotenv
+import logging
+from typing import Optional
+
+load_dotenv(override=True)
+sys.path.append(".")
+
+from genai_gateway_tools.oauth import OAuthConfig, OAuthTokenFetcher
+from tbc_security import enable_certs
+from openai import OpenAI
+
+logging.basicConfig(level=logging.INFO)
+
+def send_gpt35_request(prompt: str) -> str:
+    """
+    Sends a prompt to GPT-3.5-turbo via Gen AI Gateway and returns the response.
+    Args:
+        prompt (str): The prompt to send to the model.
+    Returns:
+        str: The model’s response.
+    Raises:
+        EnvironmentError: If required environment variables are missing.
+        ValueError: If prompt is empty.
+        Exception: For API or network errors.
+    """
+    if not prompt or not isinstance(prompt, str):
+        logging.error("Prompt must be a non-empty string.")
+        raise ValueError("Prompt must be a non-empty string.")
+
+    required_env_vars = [
+        "OAUTH_TOKEN_URL",
+        "OAUTH_CLIENT_ID",
+        "OAUTH_CLIENT_SECRET",
+        "OAUTH_GRANT_TYPE",
+        "OAUTH_SCOPE",
+        "GW_BASE_URL"
+    ]
+
+    missing_vars = [var for var in required_env_vars if not os.environ.get(var)]
+    if missing_vars:
+        logging.error(f"Missing required environment variables: {', '.join(missing_vars)}")
+        raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+    enable_certs()
+    oauth_config = OAuthConfig(
+        token_url=os.environ["OAUTH_TOKEN_URL"],
+        client_id=os.environ["OAUTH_CLIENT_ID"],
+        client_secret=os.environ["OAUTH_CLIENT_SECRET"],
+        grant_type=os.environ["OAUTH_GRANT_TYPE"],
+        scope=os.environ["OAUTH_SCOPE"]
+    )
+    token_fetcher = OAuthTokenFetcher(oauth_config)
+
+    # Retry logic for API call
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            client = OpenAI(
+                api_key=token_fetcher.get_token(),
+                base_url=os.environ.get("GW_BASE_URL")
+            )
+            response = client.chat.completions.create(
+                model="ms.anthropic.claude-sonnet-4-5-20250929-v1:0",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=6000,
+                temperature=0.2
+            )
+            result = response.choices[0].message.content
+            logging.info(f"GPT-3.5 response: {result}")
+            return result
+        except Exception as e:
+            logging.error(f"Attempt {attempt} failed: {e}")
+            if attempt == max_retries:
+                raise
