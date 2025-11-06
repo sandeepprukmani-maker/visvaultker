@@ -5,7 +5,7 @@ integrations = ["python_anthropic:1.0.0", "python_openai:1.0.0", "python_gemini:
 
 [nix]
 channel = "stable-25_05"
-packages = ["gitFull", "playwright-driver", "xorg.libxcb", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXfixes", "mesa", "cups", "nspr", "nss", "dbus", "at-spi2-core", "pango", "cairo", "alsa-lib", "libxkbcommon"]
+packages = ["alsa-lib", "at-spi2-core", "cairo", "cups", "dbus", "gitFull", "libxkbcommon", "mesa", "nspr", "nss", "pango", "playwright-driver", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXfixes", "xorg.libxcb", "libgbm"]
 
 [workflows]
 runButton = "Project"
@@ -23,9 +23,9 @@ args = "cli-tool"
 name = "cli-tool"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python example.py"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "echo \"Playwright MCP Script Generator is ready! Run with: python main.py 'your task description'\""

@@ -13,11 +13,23 @@ except ImportError:
 from rich.console import Console
 from config import (
     MODEL_CONFIGS, ModelType, EXECUTOR_SYSTEM_PROMPT,
-    CODE_GENERATOR_SYSTEM_PROMPT, HEALER_SYSTEM_PROMPT
+    CODE_GENERATOR_SYSTEM_PROMPT, HEALER_SYSTEM_PROMPT, USE_OAUTH_GATEWAY
 )
 from mcp_client import PlaywrightMCPClient
 
 console = Console()
+
+# Import OAuth gateway client if enabled
+if USE_OAUTH_GATEWAY:
+    try:
+        from llm_client import GatewayLLMClient
+        GATEWAY_CLIENT = GatewayLLMClient()
+    except Exception as e:
+        console.print(f"[yellow]Warning: Could not initialize OAuth gateway client: {e}[/yellow]")
+        console.print("[yellow]Falling back to direct API keys[/yellow]")
+        GATEWAY_CLIENT = None
+else:
+    GATEWAY_CLIENT = None
 
 
 class ExecutorAgent:
@@ -27,8 +39,12 @@ class ExecutorAgent:
         self.execution_trace: List[Dict[str, Any]] = []
         self.model_config = MODEL_CONFIGS[model]
         self.client: Union[Anthropic, OpenAI, Any] = None
+        self.use_gateway = self.model_config.get("use_gateway", False) and GATEWAY_CLIENT is not None
         
-        if model == "claude":
+        if self.use_gateway:
+            console.print(f"[cyan]Using OAuth Gen AI Gateway for {self.model_config['display_name']}[/cyan]")
+            self.client = GATEWAY_CLIENT
+        elif model == "claude":
             self.client = Anthropic(api_key=self.model_config["api_key"])
         elif model == "gpt4o":
             self.client = OpenAI(api_key=self.model_config["api_key"])
@@ -38,24 +54,35 @@ class ExecutorAgent:
                 self.client = genai.GenerativeModel(self.model_config["name"])
     
     async def execute_task(self, task_description: str) -> Dict[str, Any]:
-        console.print(f"\n[bold magenta]🤖 Executor Agent starting...[/bold magenta]")
+        console.print(f"\n[bold magenta]🤖 Intelligent Executor Agent starting...[/bold magenta]")
         console.print(f"[magenta]Model: {self.model_config['display_name']}[/magenta]")
-        console.print(f"[magenta]Task: {task_description}[/magenta]\n")
+        console.print(f"[magenta]Goal: {task_description}[/magenta]\n")
         
         self.execution_trace = []
         
         tools_description = self.mcp_client.get_tools_description()
         
-        prompt = f"""Task: {task_description}
+        prompt = f"""🎯 YOUR GOAL: {task_description}
 
 Available Playwright MCP tools:
 {tools_description}
 
-Execute this task step by step using the available tools. After each action, describe what you did and what you observe.
+APPROACH:
+1. First, THINK about the goal and plan 2-3 possible approaches to achieve it
+2. Execute your chosen approach step by step using the available tools
+3. After EACH action, observe the results and adapt if needed
+4. If something fails, immediately try an alternative approach
+5. Be creative and autonomous - make decisions to achieve the goal
+6. Use screenshots and JavaScript evaluation when you need to understand page state
 
-Start by navigating to the appropriate website and proceed with the automation."""
+Remember: You're goal-driven and intelligent. Focus on achieving the END GOAL, not just following rigid steps. Be adaptive, creative, and persistent!
+
+Begin by reasoning about the best approach, then start execution."""
         
-        if self.model == "claude":
+        # If using gateway, all models use OpenAI-compatible API
+        if self.use_gateway:
+            result = await self._execute_with_gateway(prompt)
+        elif self.model == "claude":
             result = await self._execute_with_claude(prompt)
         elif self.model == "gpt4o":
             result = await self._execute_with_gpt4o(prompt)
@@ -71,6 +98,88 @@ Start by navigating to the appropriate website and proceed with the automation."
         
         return result
     
+    async def _execute_with_gateway(self, prompt: str) -> Dict[str, Any]:
+        """Execute using OAuth Gen AI Gateway (OpenAI-compatible API)."""
+        from llm_client import GatewayLLMClient
+        
+        if not isinstance(self.client, GatewayLLMClient):
+            raise RuntimeError("Gateway client not properly initialized")
+            
+        tools = []
+        for tool in self.mcp_client.tools:
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool.get("description", ""),
+                    "parameters": tool.get("inputSchema", {})
+                }
+            })
+        
+        messages: List[Dict[str, Any]] = [
+            {"role": "system", "content": EXECUTOR_SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ]
+        
+        max_iterations = 30
+        
+        for iteration in range(max_iterations):
+            response = self.client.create_chat_completion(
+                model=self.model_config["name"],
+                messages=messages,
+                tools=tools,
+                max_tokens=6000,
+                temperature=0.2
+            )
+            
+            message = response.choices[0].message
+            messages.append({
+                "role": "assistant",
+                "content": message.content or "",
+                "tool_calls": message.tool_calls
+            })
+            
+            if not message.tool_calls:
+                console.print("[green]✓ Task execution completed[/green]")
+                break
+            
+            for tool_call in message.tool_calls:
+                tool_name = tool_call.function.name
+                tool_args = json.loads(tool_call.function.arguments)
+                
+                self.execution_trace.append({
+                    "type": "tool_call",
+                    "tool": tool_name,
+                    "arguments": tool_args
+                })
+                
+                result = await self.mcp_client.call_tool(tool_name, tool_args)
+                
+                result_content = []
+                for content_item in result.content:
+                    if hasattr(content_item, 'text'):
+                        result_content.append(content_item.text)
+                
+                result_text = "\n".join(result_content)
+                
+                self.execution_trace.append({
+                    "type": "tool_result",
+                    "tool": tool_name,
+                    "result": result_text
+                })
+                
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": result_text
+                })
+        
+        return {
+            "success": True,
+            "trace": self.execution_trace,
+            "model": self.model
+        }
+    
     async def _execute_with_claude(self, prompt: str) -> Dict[str, Any]:
         if not isinstance(self.client, Anthropic):
             raise RuntimeError("Claude client not properly initialized")
@@ -84,7 +193,7 @@ Start by navigating to the appropriate website and proceed with the automation."
             })
         
         messages: List[Dict[str, Any]] = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
-        max_iterations = 20
+        max_iterations = 30  # Increased for more complex, goal-driven workflows
         
         for iteration in range(max_iterations):
             response = self.client.messages.create(
@@ -170,7 +279,7 @@ Start by navigating to the appropriate website and proceed with the automation."
             {"role": "user", "content": prompt}
         ]
         
-        max_iterations = 20
+        max_iterations = 30  # Increased for more complex, goal-driven workflows
         
         for iteration in range(max_iterations):
             response = self.client.chat.completions.create(
@@ -240,8 +349,11 @@ class CodeGeneratorAgent:
         self.model = model
         self.model_config = MODEL_CONFIGS[model]
         self.client: Union[Anthropic, OpenAI, Any] = None
+        self.use_gateway = self.model_config.get("use_gateway", False) and GATEWAY_CLIENT is not None
         
-        if model == "claude":
+        if self.use_gateway:
+            self.client = GATEWAY_CLIENT
+        elif model == "claude":
             self.client = Anthropic(api_key=self.model_config["api_key"])
         elif model == "gpt4o":
             self.client = OpenAI(api_key=self.model_config["api_key"])
@@ -280,7 +392,9 @@ Include:
 Output ONLY the Python code, starting with imports."""
         
         code = ""
-        if self.model == "claude":
+        if self.use_gateway:
+            code = await self._generate_with_gateway(prompt)
+        elif self.model == "claude":
             code = await self._generate_with_claude(prompt)
         elif self.model == "gpt4o":
             code = await self._generate_with_gpt4o(prompt)
@@ -291,6 +405,25 @@ Output ONLY the Python code, starting with imports."""
         
         console.print("[green]✓ Code generation completed[/green]")
         return code
+    
+    async def _generate_with_gateway(self, prompt: str) -> str:
+        """Generate code using OAuth Gen AI Gateway."""
+        from llm_client import GatewayLLMClient
+        
+        if not isinstance(self.client, GatewayLLMClient):
+            raise RuntimeError("Gateway client not properly initialized")
+        
+        response = self.client.create_chat_completion(
+            model=self.model_config["name"],
+            messages=[
+                {"role": "system", "content": CODE_GENERATOR_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=6000,
+            temperature=0.2
+        )
+        
+        return response.choices[0].message.content or ""
     
     async def _generate_with_claude(self, prompt: str) -> str:
         if not isinstance(self.client, Anthropic):
@@ -350,8 +483,11 @@ class HealerAgent:
         self.model = model
         self.model_config = MODEL_CONFIGS[model]
         self.client: Union[Anthropic, OpenAI, Any] = None
+        self.use_gateway = self.model_config.get("use_gateway", False) and GATEWAY_CLIENT is not None
         
-        if model == "claude":
+        if self.use_gateway:
+            self.client = GATEWAY_CLIENT
+        elif model == "claude":
             self.client = Anthropic(api_key=self.model_config["api_key"])
         elif model == "gpt4o":
             self.client = OpenAI(api_key=self.model_config["api_key"])
@@ -386,7 +522,9 @@ Analyze the error and fix the script. Common issues:
 Output ONLY the fixed Python code, no explanations."""
         
         code = ""
-        if self.model == "claude":
+        if self.use_gateway:
+            code = await self._heal_with_gateway(prompt)
+        elif self.model == "claude":
             code = await self._heal_with_claude(prompt)
         elif self.model == "gpt4o":
             code = await self._heal_with_gpt4o(prompt)
@@ -397,6 +535,25 @@ Output ONLY the fixed Python code, no explanations."""
         
         console.print("[green]✓ Code healing completed[/green]")
         return code
+    
+    async def _heal_with_gateway(self, prompt: str) -> str:
+        """Heal code using OAuth Gen AI Gateway."""
+        from llm_client import GatewayLLMClient
+        
+        if not isinstance(self.client, GatewayLLMClient):
+            raise RuntimeError("Gateway client not properly initialized")
+        
+        response = self.client.create_chat_completion(
+            model=self.model_config["name"],
+            messages=[
+                {"role": "system", "content": HEALER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=6000,
+            temperature=0.2
+        )
+        
+        return response.choices[0].message.content or ""
     
     async def _heal_with_claude(self, prompt: str) -> str:
         if not isinstance(self.client, Anthropic):
