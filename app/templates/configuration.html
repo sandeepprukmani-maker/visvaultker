@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Configuration</h1>
+    <p class="page-description">Set up your local agent and configure automation settings</p>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Automation Engine</span>
+    </div>
+    <div style="margin-bottom: 16px;">
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+            Using Browser Use engine for AI-powered browser automation
+        </p>
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">Engine</div>
+                <div class="info-value">Browser Use (AI-Powered)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Browser Mode</span>
+    </div>
+    <div style="margin-bottom: 16px;">
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+            Choose whether to run browser in visible mode (headful) or hidden mode (headless)
+        </p>
+        <div class="mode-toggle">
+            <button class="mode-toggle-btn" id="headless-btn">
+                <span><i data-feather="eye-off"></i></span> Headless
+            </button>
+            <button class="mode-toggle-btn active" id="headful-btn">
+                <span><i data-feather="eye"></i></span> Headful
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">System Information</span>
+    </div>
+    <div class="info-grid">
+        <div class="info-item">
+            <div class="info-label">Operating System</div>
+            <div class="info-value" id="client-os">Detecting...</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Browser</div>
+            <div class="info-value" id="client-browser">Detecting...</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/configuration.js') }}"></script>
+<script>
+    feather.replace();
+</script>
+{% endblock %}
