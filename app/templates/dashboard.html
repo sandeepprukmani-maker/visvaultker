@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Automation Dashboard{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 32px;">
+    <div class="page-header" style="margin-bottom: 0;">
+        <h1 class="page-title">Automation Dashboard</h1>
+        <p class="page-description">Create browser automations using natural language</p>
+    </div>
+    <button class="btn btn-secondary" id="theme-toggle" style="margin-top: 4px;">
+        <span class="btn-icon"><i data-feather="sun" id="theme-icon"></i></span>
+        <span id="theme-text">Light</span>
+    </button>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Automation Prompt</span>
+    </div>
+    <textarea 
+        id="automation-prompt" 
+        class="textarea-large" 
+        placeholder="Describe what you want to automate, e.g., 'Navigate to Amazon and search for wireless headphones'"
+    ></textarea>
+    
+    <button class="execute-btn" id="execute-automation">
+        <span><i data-feather="zap"></i></span> Run Agent
+    </button>
+</div>
+
+<div id="output-panels-wrapper">
+    <div class="grid-2" id="script-panels-container">
+        <div class="panel" id="generated-script-panel">
+            <div class="panel-header">
+                <span class="panel-icon"><i data-feather="code"></i></span>
+                <span class="panel-title">Generated Script</span>
+                <span class="badge badge-smart">REUSABLE</span>
+                <button class="btn btn-sm btn-icon" id="copy-playwright-code" style="margin-left: auto; display: none;" title="Copy to clipboard">
+                    <i data-feather="copy"></i>
+                </button>
+            </div>
+            <div class="output-panel code-panel" id="generated-script">
+                <div class="empty-state">
+                    <div>No script generated yet</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel" id="execution-logs-panel-grid">
+            <div class="panel-header">
+                <span class="panel-icon"><i data-feather="list"></i></span>
+                <span class="panel-title">Execution Logs</span>
+            </div>
+            <div class="output-panel" id="execution-logs-grid">
+                <div class="empty-state">
+                    <div>No logs yet</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="healed-script-container" style="display: none;">
+        <div class="panel" id="healed-script-panel">
+            <div class="panel-header">
+                <span class="panel-icon"><i data-feather="refresh-cw"></i></span>
+                <span class="panel-title">Healed Script</span>
+                <span class="badge badge-smart">SMART</span>
+            </div>
+            <div class="output-panel" id="healed-script">
+                <div class="empty-state">
+                    <div>No healed script yet</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2" id="browser-use-panels-container" style="display: none;">
+    <div class="panel" id="execution-logs-panel-single">
+        <div class="panel-header">
+            <span class="panel-icon"><i data-feather="list"></i></span>
+            <span class="panel-title">Execution Logs</span>
+        </div>
+        <div class="output-panel" id="execution-logs-single">
+            <div class="empty-state">
+                <div>No logs yet</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel" id="screenshot-panel-grid">
+        <div class="panel-header">
+            <span class="panel-icon"><i data-feather="camera"></i></span>
+            <span class="panel-title">Screenshot</span>
+        </div>
+        <div class="output-panel" id="screenshot-panel-grid-content">
+            <div class="empty-state">
+                <div>No screenshot available</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel" id="screenshot-panel-single">
+    <div class="panel-header">
+        <span class="panel-icon"><i data-feather="camera"></i></span>
+        <span class="panel-title">Screenshot</span>
+    </div>
+    <div class="output-panel" id="screenshot-panel-single-content">
+        <div class="empty-state">
+            <div>No screenshot available</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script>
+    feather.replace();
+</script>
+{% endblock %}
