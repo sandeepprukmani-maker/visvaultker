@@ -157,13 +157,14 @@ class EngineOrchestrator:
                 loop.close()
             
             if result.get('success'):
+                trace_data = result['result'].get('trace', [])
                 return {
                     'success': True,
                     'result': result.get('result', {}),
                     'message': result['result'].get('message', 'Task completed'),
-                    'trace': result['result'].get('trace', []),
-                    'steps': len(result['result'].get('trace', [])),
-                    'iterations': len([t for t in result['result'].get('trace', []) if t.get('type') == 'tool_call']),
+                    'trace': trace_data,
+                    'steps': trace_data,
+                    'iterations': len([t for t in trace_data if t.get('type') == 'tool_call']),
                     'engine': 'playwright_mcp',
                     'headless': headless
                 }

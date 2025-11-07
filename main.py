@@ -11,6 +11,9 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(line_buffering=True)  # type: ignore
 os.environ['PYTHONUNBUFFERED'] = '1'
 
+# Skip Playwright browser downloads permanently
+os.environ['PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD'] = '1'
+
 # Load .env file and override any existing environment variables
 load_dotenv(override=True)
 

@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional
 
 from .mcp_client import PlaywrightMCPClient
 from .ai_agents import MCPExecutorAgent
+from auth.oauth_handler import get_oauth_token_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class PlaywrightMCPEngine:
     async def run_task(self, task_description: str, headless: bool = True, **kwargs) -> Dict[str, Any]:
         """
         Run an automation task using Playwright MCP
+        Supports both OAuth (like Browser Use) and direct API keys
         
         Args:
             task_description: Natural language description of the task
@@ -49,18 +51,35 @@ class PlaywrightMCPEngine:
         
         # Get model configuration
         model_name = kwargs.get('model_name', self.config.get('openai', 'model', fallback='gpt-4o'))
-        api_key = kwargs.get('api_key', os.environ.get('OPENAI_API_KEY', ''))
+        api_key = None
+        use_oauth = False
+        
+        gateway_base_url = os.environ.get('GW_BASE_URL', '')
+        if gateway_base_url:
+            try:
+                logger.info("🔐 Using OAuth authentication (like Browser Use)")
+                api_key = get_oauth_token_with_retry(max_retries=3)
+                use_oauth = True
+                logger.info("✅ OAuth token obtained successfully")
+            except Exception as e:
+                logger.warning(f"⚠️  OAuth authentication failed: {e}")
+                logger.info("📋 Falling back to direct API keys...")
         
         if not api_key:
-            # Try Anthropic key if OpenAI not available
+            api_key = kwargs.get('api_key', os.environ.get('OPENAI_API_KEY', ''))
+        
+        if not api_key:
             api_key = os.environ.get('ANTHROPIC_API_KEY', '')
             if api_key:
                 model_name = 'claude-sonnet-4-20250514'
+                logger.info("🤖 Using Anthropic Claude model")
         
         if not api_key:
+            error_msg = "No API key found. Please set up OAuth (GW_BASE_URL + OAuth env vars) or set OPENAI_API_KEY/ANTHROPIC_API_KEY."
+            logger.error(f"❌ {error_msg}")
             return {
                 "success": False,
-                "error": "No API key found. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable.",
+                "error": error_msg,
                 "result": None
             }
         
@@ -70,7 +89,9 @@ class PlaywrightMCPEngine:
                 self._mcp_client = mcp_client
                 
                 # Create executor agent
-                executor = MCPExecutorAgent(model_name, api_key, mcp_client)
+                # Pass gateway_base_url if using OAuth, otherwise pass None for direct API access
+                base_url = gateway_base_url if use_oauth else None
+                executor = MCPExecutorAgent(model_name, api_key, mcp_client, base_url=base_url)
                 
                 # Execute the task with headless preference
                 result = await executor.execute_task(task_description, headless=headless)

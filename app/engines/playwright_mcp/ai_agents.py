@@ -13,10 +13,11 @@ logger = logging.getLogger(__name__)
 class MCPExecutorAgent:
     """Agent that executes browser automation tasks using MCP tools"""
     
-    def __init__(self, model_name: str, api_key: str, mcp_client):
+    def __init__(self, model_name: str, api_key: str, mcp_client, base_url: str = None):
         self.model_name = model_name
         self.api_key = api_key
         self.mcp_client = mcp_client
+        self.base_url = base_url
         self.execution_trace: List[Dict[str, Any]] = []
         
         # Determine which LLM client to use
@@ -24,12 +25,21 @@ class MCPExecutorAgent:
             self.client = Anthropic(api_key=api_key)
             self.client_type = "claude"
         elif "gpt" in model_name.lower() or "openai" in model_name.lower():
-            self.client = OpenAI(api_key=api_key)
+            if base_url:
+                logger.info(f"🔐 Using OAuth gateway: {base_url}")
+                self.client = OpenAI(api_key=api_key, base_url=base_url)
+            else:
+                self.client = OpenAI(api_key=api_key)
             self.client_type = "openai"
         else:
-            # Default to claude
-            self.client = Anthropic(api_key=api_key)
-            self.client_type = "claude"
+            # Default to OpenAI with gateway if base_url provided
+            if base_url:
+                logger.info(f"🔐 Using OAuth gateway: {base_url}")
+                self.client = OpenAI(api_key=api_key, base_url=base_url)
+                self.client_type = "openai"
+            else:
+                self.client = Anthropic(api_key=api_key)
+                self.client_type = "claude"
     
     async def execute_task(self, task_description: str, headless: bool = True) -> Dict[str, Any]:
         """Execute a browser automation task"""

@@ -362,23 +362,32 @@ class IntelligentValidator:
         target: str,
         action: str
     ) -> Tuple[Optional[ElementHandle], str]:
-        """Try to find element using role-based locator"""
+        """Try to find element using role-based locator with smart matching"""
         role = self._infer_role(target, action)
         name = self._extract_name_from_target(target)
         
         if name:
-            locator = page.get_by_role(role, name=name)
-            locator_str = f'page.get_by_role("{role}", name="{name}")'
-        else:
-            locator = page.get_by_role(role).first
-            locator_str = f'page.get_by_role("{role}").first'
+            try:
+                locator = page.get_by_role(role, name=name, exact=True)
+                locator_str = f'page.get_by_role("{role}", name="{name}", exact=True)'
+                await locator.wait_for(state='attached', timeout=2000)
+                element = await locator.element_handle(timeout=1000)
+                return element, locator_str
+            except:
+                try:
+                    locator = page.get_by_role(role, name=name, exact=False)
+                    locator_str = f'page.get_by_role("{role}", name="{name}", exact=False)'
+                    await locator.wait_for(state='attached', timeout=2000)
+                    element = await locator.element_handle(timeout=1000)
+                    count = await locator.count()
+                    if count == 1:
+                        return element, locator_str
+                    else:
+                        return None, locator_str
+                except:
+                    return None, ''
         
-        try:
-            await locator.wait_for(state='attached', timeout=2000)
-            element = await locator.element_handle(timeout=1000)
-            return element, locator_str
-        except:
-            return None, locator_str
+        return None, ''
     
     async def _try_text_locator(
         self,
@@ -408,21 +417,31 @@ class IntelligentValidator:
         target: str,
         action: str
     ) -> Tuple[Optional[ElementHandle], str]:
-        """Try to find element using label"""
+        """Try to find element using label with exact matching first"""
         label = self._extract_name_from_target(target)
         
         if not label or action not in ['fill', 'select']:
             return None, ''
         
-        locator = page.get_by_label(label, exact=False)
-        locator_str = f'page.get_by_label("{label}", exact=False)'
-        
         try:
+            locator = page.get_by_label(label, exact=True)
+            locator_str = f'page.get_by_label("{label}", exact=True)'
             await locator.wait_for(state='attached', timeout=2000)
             element = await locator.element_handle(timeout=1000)
             return element, locator_str
         except:
-            return None, locator_str
+            try:
+                locator = page.get_by_label(label, exact=False)
+                locator_str = f'page.get_by_label("{label}", exact=False)'
+                await locator.wait_for(state='attached', timeout=2000)
+                count = await locator.count()
+                if count == 1:
+                    element = await locator.element_handle(timeout=1000)
+                    return element, locator_str
+                else:
+                    return None, ''
+            except:
+                return None, ''
     
     async def _try_placeholder_locator(
         self,
@@ -430,21 +449,31 @@ class IntelligentValidator:
         target: str,
         action: str
     ) -> Tuple[Optional[ElementHandle], str]:
-        """Try to find element using placeholder"""
+        """Try to find element using placeholder with exact matching first"""
         placeholder = self._extract_name_from_target(target)
         
         if not placeholder or action != 'fill':
             return None, ''
         
-        locator = page.get_by_placeholder(placeholder, exact=False)
-        locator_str = f'page.get_by_placeholder("{placeholder}", exact=False)'
-        
         try:
+            locator = page.get_by_placeholder(placeholder, exact=True)
+            locator_str = f'page.get_by_placeholder("{placeholder}", exact=True)'
             await locator.wait_for(state='attached', timeout=2000)
             element = await locator.element_handle(timeout=1000)
             return element, locator_str
         except:
-            return None, locator_str
+            try:
+                locator = page.get_by_placeholder(placeholder, exact=False)
+                locator_str = f'page.get_by_placeholder("{placeholder}", exact=False)'
+                await locator.wait_for(state='attached', timeout=2000)
+                count = await locator.count()
+                if count == 1:
+                    element = await locator.element_handle(timeout=1000)
+                    return element, locator_str
+                else:
+                    return None, ''
+            except:
+                return None, ''
     
     async def _try_css_locator(
         self,
@@ -452,19 +481,51 @@ class IntelligentValidator:
         target: str,
         action: str
     ) -> Tuple[Optional[ElementHandle], str]:
-        """Try to find element using CSS selector (last resort)"""
-        # Generate simple CSS based on action
+        """Try to find element using CSS selector with smart matching"""
+        text = self._extract_name_from_target(target)
+        target_lower = target.lower()
+        
         if action == 'click':
             selector = 'button, a, [role="button"]'
         elif action == 'fill':
-            selector = 'input[type="text"], input[type="email"], input[type="password"], textarea'
+            selectors_to_try = []
+            
+            if 'email' in target_lower:
+                selectors_to_try.append('input[type="email"]')
+            if 'password' in target_lower or 'pass' in target_lower:
+                selectors_to_try.append('input[type="password"]')
+            if 'search' in target_lower:
+                selectors_to_try.append('input[type="search"]')
+            if 'phone' in target_lower or 'tel' in target_lower:
+                selectors_to_try.append('input[type="tel"]')
+            
+            selectors_to_try.append('input[type="text"]')
+            selectors_to_try.append('input:not([type="hidden"]):not([type="submit"]):not([type="button"])')
+            selectors_to_try.append('textarea')
+            
+            for sel in selectors_to_try:
+                if text:
+                    selector = f'{sel}[placeholder*="{text}" i], {sel}[name*="{text}" i], {sel}[id*="{text}" i]'
+                else:
+                    selector = sel
+                
+                try:
+                    locator = page.locator(selector).first
+                    locator_str = f'page.locator("{selector}").first'
+                    await locator.wait_for(state='attached', timeout=1000)
+                    element = await locator.element_handle(timeout=1000)
+                    return element, locator_str
+                except:
+                    continue
+            
+            return None, ''
+            
         elif action == 'select':
             selector = 'select'
         else:
             selector = '*'
         
-        text = self._extract_name_from_target(target)
-        if text:
+        if text and action != 'fill':
             selector = f'{selector}:has-text("{text[:30]}")'
         
         locator = page.locator(selector).first
@@ -478,23 +539,36 @@ class IntelligentValidator:
             return None, locator_str
     
     async def _extract_element_info(self, element: ElementHandle) -> Dict[str, Any]:
-        """Extract detailed information about an element"""
+        """Extract detailed information about an element including label"""
         try:
-            info = await element.evaluate('''(el) => ({
-                tag: el.tagName.toLowerCase(),
-                text: el.textContent?.trim() || '',
-                value: el.value || '',
-                type: el.type || '',
-                name: el.name || '',
-                id: el.id || '',
-                className: el.className || '',
-                placeholder: el.placeholder || '',
-                ariaLabel: el.getAttribute('aria-label') || '',
-                role: el.getAttribute('role') || '',
-                disabled: el.disabled || false,
-                visible: el.offsetWidth > 0 && el.offsetHeight > 0,
-                href: el.href || ''
-            })''')
+            info = await element.evaluate('''(el) => {
+                let label = '';
+                if (el.labels && el.labels.length > 0) {
+                    label = el.labels[0].textContent?.trim() || '';
+                } else {
+                    const labelEl = document.querySelector(`label[for="${el.id}"]`);
+                    if (labelEl) {
+                        label = labelEl.textContent?.trim() || '';
+                    }
+                }
+                
+                return {
+                    tag: el.tagName.toLowerCase(),
+                    text: el.textContent?.trim() || '',
+                    value: el.value || '',
+                    type: el.type || '',
+                    name: el.name || '',
+                    id: el.id || '',
+                    className: el.className || '',
+                    placeholder: el.placeholder || '',
+                    ariaLabel: el.getAttribute('aria-label') || '',
+                    label: label,
+                    role: el.getAttribute('role') || '',
+                    disabled: el.disabled || false,
+                    visible: el.offsetWidth > 0 && el.offsetHeight > 0,
+                    href: el.href || ''
+                };
+            }''')
             return info
         except Exception as e:
             logger.warning(f"Failed to extract element info: {e}")
@@ -506,26 +580,42 @@ class IntelligentValidator:
         element_info: Dict[str, Any],
         target: str
     ) -> float:
-        """Calculate confidence score for a strategy match"""
+        """Calculate confidence score with intelligent matching"""
         base_scores = {
-            'role': 0.90,
-            'label': 0.85,
-            'placeholder': 0.80,
+            'role': 0.92,
+            'label': 0.90,
+            'placeholder': 0.88,
             'text': 0.75,
             'css': 0.50
         }
         
         score = base_scores.get(strategy, 0.50)
         
-        # Bonus if element is visible
+        target_lower = target.lower()
+        target_clean = self._extract_name_from_target(target).lower()
+        
+        elem_text = element_info.get('text', '').lower()
+        elem_name = element_info.get('name', '').lower()
+        elem_placeholder = element_info.get('placeholder', '').lower()
+        elem_aria_label = element_info.get('ariaLabel', '').lower()
+        elem_label = element_info.get('label', '').lower()
+        elem_id = element_info.get('id', '').lower()
+        
+        if target_clean == elem_placeholder or target_clean == elem_aria_label or target_clean == elem_label:
+            score += 0.15
+        elif target_clean in elem_placeholder or target_clean in elem_aria_label or target_clean in elem_label:
+            score += 0.08
+        
+        if target_clean == elem_name or target_clean == elem_id:
+            score += 0.10
+        elif target_clean in elem_name or target_clean in elem_id:
+            score += 0.05
+        
         if element_info.get('visible'):
             score += 0.05
         
-        # Bonus if text matches well
-        elem_text = element_info.get('text', '').lower()
-        target_lower = target.lower()
         if elem_text and target_lower in elem_text:
-            score += 0.05
+            score += 0.03
         
         return min(1.0, score)
     
