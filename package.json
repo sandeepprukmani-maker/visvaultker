@@ -1,0 +1,12 @@
+{
+  "name": "ai-browser-automation",
+  "version": "1.0.0",
+  "description": "AI Browser Automation with Playwright MCP",
+  "scripts": {
+    "test-mcp": "npx @playwright/mcp --help"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
