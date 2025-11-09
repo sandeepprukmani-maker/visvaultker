@@ -1,14 +1,49 @@
-# Stagehand Automation Studio
+# VisionVault - AI-Powered Browser Automation
 
 ## Overview
 
-Stagehand Automation Studio is a browser automation code generator that allows users to create web automation scripts using natural language prompts. The application features an intelligent unified interface where users describe their automation task in plain English, including the website URL and desired actions. The system automatically extracts the URL, analyzes the prompt, and selects the appropriate automation mode (act, observe, extract, or agent) based on the task description. It provides live execution logs via WebSocket streaming and generates production-ready TypeScript code. Its primary purpose is to bridge the gap between brittle selector-based automation and unpredictable AI agents, providing a developer-friendly tool that combines AI capabilities with code precision for web automation.
+VisionVault (formerly Stagehand Automation Studio) is an AI-powered browser automation platform that transforms natural language instructions into executable browser automations and generates rerunnable Playwright code with XPath locators. The application features an intelligent unified interface where users describe their automation task in plain English, including the website URL and desired actions. The system automatically extracts the URL, analyzes the prompt, and selects the appropriate automation mode (act, observe, extract, or agent) based on the task description. It provides live execution logs via WebSocket streaming and generates production-ready TypeScript code. Its primary purpose is to bridge the gap between brittle selector-based automation and unpredictable AI agents, providing a developer-friendly tool that combines AI capabilities with code precision for web automation.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
 
+## Replit Environment Setup (November 9, 2025)
+
+**Project successfully imported and configured for Replit:**
+- ✅ PostgreSQL database provisioned with pgvector extension
+- ✅ Database schema pushed using Drizzle ORM
+- ✅ Node.js dependencies installed
+- ✅ Server configured to bind to 0.0.0.0:5000 (required for Replit proxy)
+- ✅ Vite dev server configured with allowedHosts: true for iframe preview
+- ✅ Workflow configured for development server on port 5000
+- ✅ Deployment settings configured (autoscale with build and run commands)
+- ✅ Application tested and running successfully
+
+**Environment Variables Required:**
+- `DATABASE_URL` - PostgreSQL connection string (auto-provisioned)
+- **For Browser Automation (Required):**
+  - `OPENAI_API_KEY` - OpenAI API key for Stagehand automation models
+  - OR any other AI model API key supported by Stagehand (Anthropic, etc.)
+- **For Semantic Caching (Optional):**
+  - `GOOGLE_AI_API_KEY` - Google Gemini API key for text embeddings and semantic cache
+  - `DISABLE_EMBEDDINGS=true` - Explicitly disable embedding features if needed
+- **For Cloud Browser (Optional):**
+  - `BROWSERBASE_API_KEY` - For cloud browser automation
+  - `BROWSERBASE_PROJECT_ID` - BrowserBase project ID
+- `NODE_ENV` - Set to "development" for dev mode
+
+**Note:** Semantic caching (text embeddings) is now optional. The core automation and code generation features work without `GOOGLE_AI_API_KEY`. When embeddings are disabled, the system will skip cache lookups and continue with normal automation execution.
+
 ## Recent Changes (November 9, 2025)
+
+### Embeddings Made Optional ✅ COMPLETE
+- **Feature Flag System**: Text embeddings are now optional and automatically disabled when `GOOGLE_AI_API_KEY` is not available
+- **Graceful Degradation**: Semantic cache lookups return null when embeddings are disabled, automation continues normally
+- **Zero-Impact on Core Features**: Automation and code generation work without embeddings - only semantic caching is affected
+- **Clear Logging**: System logs once when embeddings are disabled: "ℹ️ Embeddings disabled - semantic caching unavailable"
+- **Implementation**: Updated `server/semantic-cache.ts` to check for API key availability and short-circuit embedding operations
+- **Database Compatibility**: History storage works with null embeddings, pgvector column accepts null values
 
 ### Rerunnable Code Generation System ✅ COMPLETE
 - **Locator-based Code Generator**: Converts Stagehand automation steps into production-ready TypeScript code that can run without LLM inference

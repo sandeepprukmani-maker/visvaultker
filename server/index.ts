@@ -73,8 +73,8 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
 
-  // Use 127.0.0.1 for local development
-  const host = '127.0.0.1';
+  // Use 0.0.0.0 to bind to all interfaces (required for Replit)
+  const host = '0.0.0.0';
 
   // Use the traditional listen signature for better Windows compatibility
   server.listen(port, host, () => {
