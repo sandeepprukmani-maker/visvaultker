@@ -1,56 +1,70 @@
-import { spawn } from "child_process";
-import { Stagehand } from "@browserbasehq/stagehand";
+import { LLMClient } from "@browserbasehq/stagehand";
+import https from "https";
 
-async function fetchOAuthConfig() {
-  return new Promise((resolve, reject) => {
-    const pythonProcess = spawn("python", ["fetch_token.py"]);
-    let output = "";
-    let errorOutput = "";
+class CustomLLMClient extends LLMClient {
+  private apiEndpoint: string;
+  private apiKey: string;
 
-    pythonProcess.stdout.on("data", (data) => (output += data.toString()));
-    pythonProcess.stderr.on("data", (data) => (errorOutput += data.toString()));
+  constructor(apiEndpoint: string, apiKey: string) {
+    // Use a recognized provider/model format
+    super("openai/gpt-4");
+    this.apiEndpoint = apiEndpoint;
+    this.apiKey = apiKey;
+  }
 
-    pythonProcess.on("close", (code) => {
-      if (code !== 0) reject(new Error(`Python script failed: ${errorOutput}`));
-      else {
-        try {
-          const result = JSON.parse(output.trim());
-          if (result.error) reject(new Error(`OAuth error: ${result.error}`));
-          else resolve(result);
-        } catch {
-          reject(new Error("Failed to parse OAuth response: " + output));
-        }
-      }
+  async createChatCompletion(options: any): Promise<any> {
+    const { messages, temperature, maxTokens } = options.options;
+    
+    const requestBody = JSON.stringify({
+      model: "gpt-4-1-2025-04-14-eastus-dz",
+      messages,
+      temperature,
+      max_tokens: maxTokens,
     });
-  });
+
+    const data = await new Promise((resolve, reject) => {
+      const url = new URL(this.apiEndpoint);
+      const req = https.request({
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: url.pathname,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.apiKey}`,
+        },
+        rejectUnauthorized: false,
+      }, (res) => {
+        let responseData = "";
+        res.on("data", (chunk) => responseData += chunk);
+        res.on("end", () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(JSON.parse(responseData));
+          } else {
+            reject(new Error(`API error: ${res.statusCode}`));
+          }
+        });
+      });
+      
+      req.on("error", reject);
+      req.write(requestBody);
+      req.end();
+    });
+
+    return data;
+  }
 }
 
-async function main() {
-  console.log("Starting Stagehand with OAuth...");
+// Usage
+const oauthConfig = await fetchOAuthConfig();
+const customClient = new CustomLLMClient(
+  `${oauthConfig.baseURL}/chat/completions`,
+  oauthConfig.apiKey
+);
 
-  const oauthConfig = await fetchOAuthConfig();
-
-  const stagehand = new Stagehand({
-    env: "LOCAL",
-    model: {
-      modelName: "gpt-4-1-2025-04-14-eastus-dz",
-      apiKey: oauthConfig.apiKey,
-      baseURL: oauthConfig.baseURL,
-    },
-    verbose: 1,
-    headless: false,
-  });
-
-  console.log("Initializing Stagehand...");
-  await stagehand.init();
-
-  console.log("Navigating to LinkedIn...");
-  await stagehand.goto("https://www.linkedin.com");
-
-  console.log("Clicking 'Join now' button...");
-  await stagehand.act("click on the 'Join now' button");
-
-  console.log("✅ Clicked 'Join now'");
-}
-
-main().catch(console.error);
+const stagehand = new Stagehand({
+  env: "LOCAL",
+  llmClient: customClient,
+  verbose: 1,
+  headless: false,
+});
