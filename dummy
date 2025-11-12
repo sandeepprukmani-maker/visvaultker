@@ -8,6 +8,11 @@ import {
 } from "@browserbasehq/stagehand";
 import https from "https";
 
+/**
+ * -----------------------------
+ *  Custom LLM Client Definition
+ * -----------------------------
+ */
 class CustomLLMClient extends LLMClient {
   type = "custom";
   private apiEndpoint: string;
@@ -85,8 +90,7 @@ class CustomLLMClient extends LLMClient {
           Authorization: `Bearer ${this.apiKey}`,
           "Content-Length": Buffer.byteLength(requestBody),
         },
-        // ⚠️ In production, this should be true; set to false only for local dev with self-signed certs
-        rejectUnauthorized: true,
+        rejectUnauthorized: true, // safer for production
       };
 
       const data = await new Promise<any>((resolve, reject) => {
@@ -112,13 +116,11 @@ class CustomLLMClient extends LLMClient {
             }
           });
         });
-
         req.on("error", reject);
         req.write(requestBody);
         req.end();
       });
 
-      // Format response to match Stagehand’s LLMResponse interface
       const formattedResponse: LLMResponse = {
         id: data.id || `custom-${Date.now()}`,
         object: "chat.completion",
@@ -154,7 +156,6 @@ class CustomLLMClient extends LLMClient {
       });
 
       if (retries > 0) {
-        // ✅ Correct retry logic
         return this.createChatCompletion(options, logger, retries - 1);
       }
       throw error;
@@ -162,7 +163,11 @@ class CustomLLMClient extends LLMClient {
   }
 }
 
-// Fetch OAuth configuration from a Python script
+/**
+ * -----------------------------
+ *  OAuth Config Fetcher
+ * -----------------------------
+ */
 async function fetchOAuthConfig(): Promise<{ apiKey: string; baseURL: string }> {
   return new Promise((resolve, reject) => {
     const pythonProcess = spawn("python", ["fetch_token.py"]);
@@ -191,6 +196,66 @@ async function fetchOAuthConfig(): Promise<{ apiKey: string; baseURL: string }> 
   });
 }
 
+/**
+ * -----------------------------
+ *  SafeAct Utility Wrapper
+ * -----------------------------
+ */
+export async function safeAct(
+  stagehand: any,
+  instruction: string,
+  options: {
+    retries?: number;
+    timeout?: number;
+    waitForLoadState?: "domcontentloaded" | "networkidle" | "load";
+    waitBetweenRetries?: number;
+  } = {}
+) {
+  const {
+    retries = 3,
+    timeout = 15000,
+    waitForLoadState = "domcontentloaded",
+    waitBetweenRetries = 2000,
+  } = options;
+
+  const page = stagehand.page;
+  console.log(`🧭 safeAct: "${instruction}"`);
+
+  await page.waitForLoadState(waitForLoadState);
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    console.log(`🔍 Attempt ${attempt}: observing "${instruction}"...`);
+
+    try {
+      const [action] = await stagehand.observe(instruction, { timeout });
+
+      if (action) {
+        console.log(`✅ Element found. Acting...`);
+        await stagehand.act(action, { timeout });
+        console.log(`🎯 Success: "${instruction}"`);
+        return true;
+      } else {
+        console.warn(`⚠️ No actionable element found (attempt ${attempt})`);
+      }
+    } catch (err) {
+      console.warn(`⚠️ Attempt ${attempt} failed: ${String(err)}`);
+    }
+
+    if (attempt < retries) {
+      console.log(`⏳ Retrying in ${waitBetweenRetries / 1000}s...`);
+      await page.waitForTimeout(waitBetweenRetries);
+    }
+  }
+
+  console.error(`❌ Failed to execute: "${instruction}"`);
+  return false;
+}
+
+/**
+ * -----------------------------
+ *  Main Execution
+ * -----------------------------
+ */
 async function main() {
   console.log("🚀 Starting Stagehand with OAuth...");
 
@@ -213,13 +278,18 @@ async function main() {
 
     console.log("🧠 Initializing Stagehand...");
     await stagehand.init();
-
     const page = stagehand.page;
 
     console.log("🌐 Navigating to Google...");
     await page.goto("https://www.google.com");
+    await page.waitForLoadState("domcontentloaded");
 
-    console.log("✅ Stagehand ready!");
+    // Example: using safeAct()
+    await safeAct(stagehand, "accept cookies");
+    await safeAct(stagehand, "type 'Stagehand LLM' into the search box");
+    await safeAct(stagehand, "press the Enter key");
+
+    console.log("✅ Stagehand automation completed!");
   } catch (err) {
     console.error("❌ Initialization error:", err);
   }
