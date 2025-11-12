@@ -8,11 +8,10 @@ import {
 } from "@browserbasehq/stagehand";
 import https from "https";
 
-/**
- * -----------------------------
- *  Custom LLM Client Definition
- * -----------------------------
- */
+/* -----------------------------------------------------
+ * 🧠 Custom LLM Client
+ * Extends Stagehand’s LLMClient to support a custom API endpoint.
+ * ----------------------------------------------------- */
 class CustomLLMClient extends LLMClient {
   type = "custom";
   private apiEndpoint: string;
@@ -45,6 +44,7 @@ class CustomLLMClient extends LLMClient {
     const { messages, temperature, maxTokens, tools, tool_choice } = options;
 
     try {
+      // Build request payload
       const requestPayload: Record<string, any> = {
         model: this.actualModelName,
         messages: messages.map((msg) => ({
@@ -58,6 +58,7 @@ class CustomLLMClient extends LLMClient {
         max_tokens: maxTokens,
       };
 
+      // Handle tool definitions
       if (tools?.length) {
         requestPayload.tools = tools.map((tool) =>
           tool.function
@@ -77,6 +78,7 @@ class CustomLLMClient extends LLMClient {
         requestPayload.tool_choice = tool_choice;
       }
 
+      // HTTPS request setup
       const requestBody = JSON.stringify(requestPayload);
       const url = new URL(this.apiEndpoint);
 
@@ -90,9 +92,10 @@ class CustomLLMClient extends LLMClient {
           Authorization: `Bearer ${this.apiKey}`,
           "Content-Length": Buffer.byteLength(requestBody),
         },
-        rejectUnauthorized: true, // safer for production
+        rejectUnauthorized: true, // ✅ Use false only for local self-signed certs
       };
 
+      // Send request
       const data = await new Promise<any>((resolve, reject) => {
         const req = https.request(httpsOptions, (res) => {
           let responseData = "";
@@ -116,11 +119,13 @@ class CustomLLMClient extends LLMClient {
             }
           });
         });
+
         req.on("error", reject);
         req.write(requestBody);
         req.end();
       });
 
+      // Normalize response
       const formattedResponse: LLMResponse = {
         id: data.id || `custom-${Date.now()}`,
         object: "chat.completion",
@@ -156,6 +161,7 @@ class CustomLLMClient extends LLMClient {
       });
 
       if (retries > 0) {
+        console.warn(`Retrying... (${retries - 1} retries left)`);
         return this.createChatCompletion(options, logger, retries - 1);
       }
       throw error;
@@ -163,11 +169,9 @@ class CustomLLMClient extends LLMClient {
   }
 }
 
-/**
- * -----------------------------
- *  OAuth Config Fetcher
- * -----------------------------
- */
+/* -----------------------------------------------------
+ * 🔑 Fetch OAuth Config (via Python)
+ * ----------------------------------------------------- */
 async function fetchOAuthConfig(): Promise<{ apiKey: string; baseURL: string }> {
   return new Promise((resolve, reject) => {
     const pythonProcess = spawn("python", ["fetch_token.py"]);
@@ -196,11 +200,10 @@ async function fetchOAuthConfig(): Promise<{ apiKey: string; baseURL: string }> 
   });
 }
 
-/**
- * -----------------------------
- *  SafeAct Utility Wrapper
- * -----------------------------
- */
+/* -----------------------------------------------------
+ * 🧩 Safe Action Wrapper (safeAct)
+ * Adds retries, observation, and load waiting for reliability.
+ * ----------------------------------------------------- */
 export async function safeAct(
   stagehand: any,
   instruction: string,
@@ -251,17 +254,17 @@ export async function safeAct(
   return false;
 }
 
-/**
- * -----------------------------
- *  Main Execution
- * -----------------------------
- */
+/* -----------------------------------------------------
+ * 🚀 Main Entry Point
+ * ----------------------------------------------------- */
 async function main() {
   console.log("🚀 Starting Stagehand with OAuth...");
 
   try {
+    // 1️⃣ Fetch OAuth credentials
     const oauthConfig = await fetchOAuthConfig();
 
+    // 2️⃣ Initialize Custom LLM Client
     const rbcLLMClient = new CustomLLMClient({
       modelName: "gpt-4o",
       apiEndpoint: `${oauthConfig.baseURL}/chat/completions`,
@@ -269,6 +272,7 @@ async function main() {
       actualModelName: "gpt-4.1-2025-04-14-eastus-dz",
     });
 
+    // 3️⃣ Create Stagehand instance
     const stagehand = new Stagehand({
       env: "LOCAL",
       llmClient: rbcLLMClient,
@@ -278,13 +282,14 @@ async function main() {
 
     console.log("🧠 Initializing Stagehand...");
     await stagehand.init();
+
     const page = stagehand.page;
 
+    // 4️⃣ Navigate and perform actions
     console.log("🌐 Navigating to Google...");
     await page.goto("https://www.google.com");
     await page.waitForLoadState("domcontentloaded");
 
-    // Example: using safeAct()
     await safeAct(stagehand, "accept cookies");
     await safeAct(stagehand, "type 'Stagehand LLM' into the search box");
     await safeAct(stagehand, "press the Enter key");
@@ -295,4 +300,5 @@ async function main() {
   }
 }
 
+// Run main
 main();
