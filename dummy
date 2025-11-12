@@ -68,3 +68,45 @@ const stagehand = new Stagehand({
   verbose: 1,
   headless: false,
 });
+
+
+
+The error you're seeing (Cannot read properties of undefined (reading 'elementId')) typically occurs when your custom LLM client returns a response in an unexpected format. Based on the search results, here's what you need to fix:
+
+Your custom LLM client must return responses in this exact format:
+
+{
+  choices: [{
+    message: {
+      content: string  // The actual response text
+    }
+  }]
+}
+
+Update your createChatCompletion method:
+
+async createChatCompletion(options: any): Promise<any> {
+  const { messages, temperature, maxTokens } = options.options;
+  
+  const requestBody = JSON.stringify({
+    model: "gpt-4-1-2025-04-14-eastus-dz",
+    messages,
+    temperature,
+    max_tokens: maxTokens,
+  });
+
+  const data = await new Promise((resolve, reject) => {
+    // ... your existing request code ...
+  });
+
+  // Transform response to match Stagehand's expected format
+  return {
+    choices: [{
+      message: {
+        content: data.choices?.[0]?.message?.content || ""
+      }
+    }]
+  };
+}
+
+If your API returns a different structure, you'll need to map it to this format. The key is ensuring the response has choices[0].message.content containing the LLM's text response.
