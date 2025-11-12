@@ -1,112 +1,228 @@
-import { LLMClient } from "@browserbasehq/stagehand";
+import { spawn } from "child_process";
+import {
+  Stagehand,
+  LLMClient,
+  CreateChatCompletionOptions,
+  LLMResponse,
+  AvailableModel,
+} from "@browserbasehq/stagehand";
 import https from "https";
 
 class CustomLLMClient extends LLMClient {
+  type = "custom";
   private apiEndpoint: string;
   private apiKey: string;
+  private actualModelName: string;
 
-  constructor(apiEndpoint: string, apiKey: string) {
-    // Use a recognized provider/model format
-    super("openai/gpt-4");
+  constructor({
+    modelName = "gpt-4o" as AvailableModel,
+    apiEndpoint,
+    apiKey,
+    actualModelName = "gpt-4.1-2025-04-14-eastus-dz",
+  }: {
+    modelName?: AvailableModel;
+    apiEndpoint: string;
+    apiKey: string;
+    actualModelName?: string;
+  }) {
+    super(modelName);
     this.apiEndpoint = apiEndpoint;
     this.apiKey = apiKey;
+    this.actualModelName = actualModelName;
+    this.hasVision = false;
   }
 
-  async createChatCompletion(options: any): Promise<any> {
-    const { messages, temperature, maxTokens } = options.options;
-    
-    const requestBody = JSON.stringify({
-      model: "gpt-4-1-2025-04-14-eastus-dz",
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-    });
+  async createChatCompletion<T = LLMResponse>(
+    options: CreateChatCompletionOptions,
+    logger: (log: { category: string; level: number; message: string }) => void,
+    retries = 3
+  ): Promise<T> {
+    const { messages, temperature, maxTokens, tools, tool_choice } = options;
 
-    const data = await new Promise((resolve, reject) => {
+    try {
+      const requestPayload: Record<string, any> = {
+        model: this.actualModelName,
+        messages: messages.map((msg) => ({
+          role: msg.role,
+          content:
+            typeof msg.content === "string"
+              ? msg.content
+              : JSON.stringify(msg.content),
+        })),
+        temperature,
+        max_tokens: maxTokens,
+      };
+
+      if (tools?.length) {
+        requestPayload.tools = tools.map((tool) =>
+          tool.function
+            ? tool
+            : {
+                type: tool.type || "function",
+                function: {
+                  name: tool.name,
+                  description: tool.description,
+                  parameters: tool.parameters,
+                },
+              }
+        );
+      }
+
+      if (tool_choice) {
+        requestPayload.tool_choice = tool_choice;
+      }
+
+      const requestBody = JSON.stringify(requestPayload);
       const url = new URL(this.apiEndpoint);
-      const req = https.request({
+
+      const httpsOptions = {
         hostname: url.hostname,
         port: url.port || 443,
-        path: url.pathname,
+        path: url.pathname + url.search,
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Length": Buffer.byteLength(requestBody),
         },
-        rejectUnauthorized: false,
-      }, (res) => {
-        let responseData = "";
-        res.on("data", (chunk) => responseData += chunk);
-        res.on("end", () => {
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve(JSON.parse(responseData));
-          } else {
-            reject(new Error(`API error: ${res.statusCode}`));
-          }
-        });
-      });
-      
-      req.on("error", reject);
-      req.write(requestBody);
-      req.end();
-    });
+        // ⚠️ In production, this should be true; set to false only for local dev with self-signed certs
+        rejectUnauthorized: true,
+      };
 
-    return data;
+      const data = await new Promise<any>((resolve, reject) => {
+        const req = https.request(httpsOptions, (res) => {
+          let responseData = "";
+          res.on("data", (chunk) => (responseData += chunk));
+          res.on("end", () => {
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              try {
+                resolve(JSON.parse(responseData));
+              } catch {
+                reject(new Error(`Failed to parse response: ${responseData}`));
+              }
+            } else {
+              reject(
+                new Error(
+                  `API request failed (${res.statusCode}): ${responseData.slice(
+                    0,
+                    500
+                  )}`
+                )
+              );
+            }
+          });
+        });
+
+        req.on("error", reject);
+        req.write(requestBody);
+        req.end();
+      });
+
+      // Format response to match Stagehand’s LLMResponse interface
+      const formattedResponse: LLMResponse = {
+        id: data.id || `custom-${Date.now()}`,
+        object: "chat.completion",
+        created: data.created || Math.floor(Date.now() / 1000),
+        model: this.actualModelName,
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content:
+                data.choices?.[0]?.message?.content || data.content || "",
+              tool_calls: data.choices?.[0]?.message?.tool_calls || [],
+            },
+            finish_reason: data.choices?.[0]?.finish_reason || "stop",
+          },
+        ],
+        usage: {
+          prompt_tokens: data.usage?.prompt_tokens || 0,
+          completion_tokens: data.usage?.completion_tokens || 0,
+          total_tokens: data.usage?.total_tokens || 0,
+        },
+      };
+
+      return formattedResponse as T;
+    } catch (error) {
+      logger({
+        category: "custom-llm",
+        level: 0,
+        message: `Error: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+
+      if (retries > 0) {
+        // ✅ Correct retry logic
+        return this.createChatCompletion(options, logger, retries - 1);
+      }
+      throw error;
+    }
   }
 }
 
-// Usage
-const oauthConfig = await fetchOAuthConfig();
-const customClient = new CustomLLMClient(
-  `${oauthConfig.baseURL}/chat/completions`,
-  oauthConfig.apiKey
-);
+// Fetch OAuth configuration from a Python script
+async function fetchOAuthConfig(): Promise<{ apiKey: string; baseURL: string }> {
+  return new Promise((resolve, reject) => {
+    const pythonProcess = spawn("python", ["fetch_token.py"]);
+    let output = "";
+    let errorOutput = "";
 
-const stagehand = new Stagehand({
-  env: "LOCAL",
-  llmClient: customClient,
-  verbose: 1,
-  headless: false,
-});
+    pythonProcess.stdout.on("data", (data) => (output += data.toString()));
+    pythonProcess.stderr.on("data", (data) => (errorOutput += data.toString()));
 
-
-
-The error you're seeing (Cannot read properties of undefined (reading 'elementId')) typically occurs when your custom LLM client returns a response in an unexpected format. Based on the search results, here's what you need to fix:
-
-Your custom LLM client must return responses in this exact format:
-
-{
-  choices: [{
-    message: {
-      content: string  // The actual response text
-    }
-  }]
-}
-
-Update your createChatCompletion method:
-
-async createChatCompletion(options: any): Promise<any> {
-  const { messages, temperature, maxTokens } = options.options;
-  
-  const requestBody = JSON.stringify({
-    model: "gpt-4-1-2025-04-14-eastus-dz",
-    messages,
-    temperature,
-    max_tokens: maxTokens,
-  });
-
-  const data = await new Promise((resolve, reject) => {
-    // ... your existing request code ...
-  });
-
-  // Transform response to match Stagehand's expected format
-  return {
-    choices: [{
-      message: {
-        content: data.choices?.[0]?.message?.content || ""
+    pythonProcess.on("close", (code) => {
+      if (code !== 0) {
+        return reject(new Error(`Python script failed: ${errorOutput}`));
       }
-    }]
-  };
+
+      try {
+        const result = JSON.parse(output.trim());
+        if (result.error) {
+          reject(new Error(`OAuth error: ${result.error}`));
+        } else {
+          resolve(result);
+        }
+      } catch {
+        reject(new Error(`Failed to parse OAuth response: ${output}`));
+      }
+    });
+  });
 }
 
-If your API returns a different structure, you'll need to map it to this format. The key is ensuring the response has choices[0].message.content containing the LLM's text response.
+async function main() {
+  console.log("🚀 Starting Stagehand with OAuth...");
+
+  try {
+    const oauthConfig = await fetchOAuthConfig();
+
+    const rbcLLMClient = new CustomLLMClient({
+      modelName: "gpt-4o",
+      apiEndpoint: `${oauthConfig.baseURL}/chat/completions`,
+      apiKey: oauthConfig.apiKey,
+      actualModelName: "gpt-4.1-2025-04-14-eastus-dz",
+    });
+
+    const stagehand = new Stagehand({
+      env: "LOCAL",
+      llmClient: rbcLLMClient,
+      verbose: 1,
+      headless: false,
+    });
+
+    console.log("🧠 Initializing Stagehand...");
+    await stagehand.init();
+
+    const page = stagehand.page;
+
+    console.log("🌐 Navigating to Google...");
+    await page.goto("https://www.google.com");
+
+    console.log("✅ Stagehand ready!");
+  } catch (err) {
+    console.error("❌ Initialization error:", err);
+  }
+}
+
+main();
