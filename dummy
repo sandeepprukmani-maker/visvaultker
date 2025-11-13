@@ -1,0 +1,51 @@
+async createChatCompletion(
+  options: CreateChatCompletionOptions
+): Promise<LLMResponse> {
+  const { messages, temperature, maxTokens, logger, response_model } = options;
+
+  try {
+    // … build requestPayload …
+    const data = await …;
+
+    const messageContent = data.choices?.[0]?.message?.content || "";
+
+    const response: LLMResponse = {
+      id: `custom-${Date.now()}`,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: this.actualModelName,
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant",
+            content: messageContent,
+            ...(data.choices?.[0]?.message?.tool_calls ? { tool_calls: data.choices[0].message.tool_calls } : {})
+          },
+          finish_reason: data.choices?.[0]?.finish_reason || "stop",
+        }
+      ],
+      usage: {
+        prompt_tokens: data.usage?.prompt_tokens ?? 0,
+        completion_tokens: data.usage?.completion_tokens ?? 0,
+        total_tokens: data.usage?.total_tokens ?? 0,
+      }
+    };
+
+    if (response_model) {
+      try {
+        const parsed = JSON.parse(messageContent);
+        response.choices[0].message.content = JSON.stringify(parsed);
+        return response;
+      } catch (err) {
+        logger({ category: "custom-llm", message: `Failed JSON parse: ${String(err)}`, level: 0 });
+        throw new Error(`Invalid JSON response: ${messageContent}`);
+      }
+    }
+
+    return response;
+  } catch (err) {
+    logger({ category: "custom-llm", message: `Error: ${String(err)}`, level: 0 });
+    throw err;
+  }
+}
