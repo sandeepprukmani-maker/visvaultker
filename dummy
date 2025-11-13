@@ -1,304 +1,81 @@
 import { spawn } from "child_process";
-import {
-  Stagehand,
-  LLMClient,
-  CreateChatCompletionOptions,
-  LLMResponse,
-  AvailableModel,
-} from "@browserbasehq/stagehand";
-import https from "https";
+import { Stagehand, AISdkClient } from "browserbasehq/stagehand";
+import { createOpenAI } from "@ai-sdk/openai";
 
-/* -----------------------------------------------------
- * 🧠 Custom LLM Client
- * Extends Stagehand’s LLMClient to support a custom API endpoint.
- * ----------------------------------------------------- */
-class CustomLLMClient extends LLMClient {
-  type = "custom";
-  private apiEndpoint: string;
-  private apiKey: string;
-  private actualModelName: string;
-
-  constructor({
-    modelName = "gpt-4o" as AvailableModel,
-    apiEndpoint,
-    apiKey,
-    actualModelName = "gpt-4.1-2025-04-14-eastus-dz",
-  }: {
-    modelName?: AvailableModel;
-    apiEndpoint: string;
-    apiKey: string;
-    actualModelName?: string;
-  }) {
-    super(modelName);
-    this.apiEndpoint = apiEndpoint;
-    this.apiKey = apiKey;
-    this.actualModelName = actualModelName;
-    this.hasVision = false;
-  }
-
-  async createChatCompletion<T = LLMResponse>(
-    options: CreateChatCompletionOptions,
-    logger: (log: { category: string; level: number; message: string }) => void,
-    retries = 3
-  ): Promise<T> {
-    const { messages, temperature, maxTokens, tools, tool_choice } = options;
-
-    try {
-      // Build request payload
-      const requestPayload: Record<string, any> = {
-        model: this.actualModelName,
-        messages: messages.map((msg) => ({
-          role: msg.role,
-          content:
-            typeof msg.content === "string"
-              ? msg.content
-              : JSON.stringify(msg.content),
-        })),
-        temperature,
-        max_tokens: maxTokens,
-      };
-
-      // Handle tool definitions
-      if (tools?.length) {
-        requestPayload.tools = tools.map((tool) =>
-          tool.function
-            ? tool
-            : {
-                type: tool.type || "function",
-                function: {
-                  name: tool.name,
-                  description: tool.description,
-                  parameters: tool.parameters,
-                },
-              }
-        );
-      }
-
-      if (tool_choice) {
-        requestPayload.tool_choice = tool_choice;
-      }
-
-      // HTTPS request setup
-      const requestBody = JSON.stringify(requestPayload);
-      const url = new URL(this.apiEndpoint);
-
-      const httpsOptions = {
-        hostname: url.hostname,
-        port: url.port || 443,
-        path: url.pathname + url.search,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Length": Buffer.byteLength(requestBody),
-        },
-        rejectUnauthorized: true, // ✅ Use false only for local self-signed certs
-      };
-
-      // Send request
-      const data = await new Promise<any>((resolve, reject) => {
-        const req = https.request(httpsOptions, (res) => {
-          let responseData = "";
-          res.on("data", (chunk) => (responseData += chunk));
-          res.on("end", () => {
-            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-              try {
-                resolve(JSON.parse(responseData));
-              } catch {
-                reject(new Error(`Failed to parse response: ${responseData}`));
-              }
-            } else {
-              reject(
-                new Error(
-                  `API request failed (${res.statusCode}): ${responseData.slice(
-                    0,
-                    500
-                  )}`
-                )
-              );
-            }
-          });
-        });
-
-        req.on("error", reject);
-        req.write(requestBody);
-        req.end();
-      });
-
-      // Normalize response
-      const formattedResponse: LLMResponse = {
-        id: data.id || `custom-${Date.now()}`,
-        object: "chat.completion",
-        created: data.created || Math.floor(Date.now() / 1000),
-        model: this.actualModelName,
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: "assistant",
-              content:
-                data.choices?.[0]?.message?.content || data.content || "",
-              tool_calls: data.choices?.[0]?.message?.tool_calls || [],
-            },
-            finish_reason: data.choices?.[0]?.finish_reason || "stop",
-          },
-        ],
-        usage: {
-          prompt_tokens: data.usage?.prompt_tokens || 0,
-          completion_tokens: data.usage?.completion_tokens || 0,
-          total_tokens: data.usage?.total_tokens || 0,
-        },
-      };
-
-      return formattedResponse as T;
-    } catch (error) {
-      logger({
-        category: "custom-llm",
-        level: 0,
-        message: `Error: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      });
-
-      if (retries > 0) {
-        console.warn(`Retrying... (${retries - 1} retries left)`);
-        return this.createChatCompletion(options, logger, retries - 1);
-      }
-      throw error;
-    }
-  }
-}
-
-/* -----------------------------------------------------
- * 🔑 Fetch OAuth Config (via Python)
- * ----------------------------------------------------- */
-async function fetchOAuthConfig(): Promise<{ apiKey: string; baseURL: string }> {
+// 🔹 Step 1: Fetch token from Python
+async function fetchOAuthToken(): Promise<string> {
   return new Promise((resolve, reject) => {
-    const pythonProcess = spawn("python", ["fetch_token.py"]);
+    const python = spawn("python", ["fetch_token.py"]);
+
     let output = "";
     let errorOutput = "";
 
-    pythonProcess.stdout.on("data", (data) => (output += data.toString()));
-    pythonProcess.stderr.on("data", (data) => (errorOutput += data.toString()));
+    python.stdout.on("data", (data) => {
+      output += data.toString();
+    });
 
-    pythonProcess.on("close", (code) => {
+    python.stderr.on("data", (data) => {
+      errorOutput += data.toString();
+    });
+
+    python.on("close", (code) => {
       if (code !== 0) {
-        return reject(new Error(`Python script failed: ${errorOutput}`));
-      }
-
-      try {
-        const result = JSON.parse(output.trim());
-        if (result.error) {
-          reject(new Error(`OAuth error: ${result.error}`));
-        } else {
-          resolve(result);
+        reject(new Error(`fetch_token.py failed: ${errorOutput}`));
+      } else {
+        try {
+          const result = JSON.parse(output.trim());
+          if (result.error) reject(new Error(result.error));
+          else resolve(result.api_key);
+        } catch (err) {
+          reject(new Error(`Failed to parse fetch_token.py output: ${output}`));
         }
-      } catch {
-        reject(new Error(`Failed to parse OAuth response: ${output}`));
       }
     });
   });
 }
 
-/* -----------------------------------------------------
- * 🧩 Safe Action Wrapper (safeAct)
- * Adds retries, observation, and load waiting for reliability.
- * ----------------------------------------------------- */
-export async function safeAct(
-  stagehand: any,
-  instruction: string,
-  options: {
-    retries?: number;
-    timeout?: number;
-    waitForLoadState?: "domcontentloaded" | "networkidle" | "load";
-    waitBetweenRetries?: number;
-  } = {}
-) {
-  const {
-    retries = 3,
-    timeout = 15000,
-    waitForLoadState = "domcontentloaded",
-    waitBetweenRetries = 2000,
-  } = options;
-
-  const page = stagehand.page;
-  console.log(`🧭 safeAct: "${instruction}"`);
-
-  await page.waitForLoadState(waitForLoadState);
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    console.log(`🔍 Attempt ${attempt}: observing "${instruction}"...`);
-
-    try {
-      const [action] = await stagehand.observe(instruction, { timeout });
-
-      if (action) {
-        console.log(`✅ Element found. Acting...`);
-        await stagehand.act(action, { timeout });
-        console.log(`🎯 Success: "${instruction}"`);
-        return true;
-      } else {
-        console.warn(`⚠️ No actionable element found (attempt ${attempt})`);
-      }
-    } catch (err) {
-      console.warn(`⚠️ Attempt ${attempt} failed: ${String(err)}`);
-    }
-
-    if (attempt < retries) {
-      console.log(`⏳ Retrying in ${waitBetweenRetries / 1000}s...`);
-      await page.waitForTimeout(waitBetweenRetries);
-    }
-  }
-
-  console.error(`❌ Failed to execute: "${instruction}"`);
-  return false;
-}
-
-/* -----------------------------------------------------
- * 🚀 Main Entry Point
- * ----------------------------------------------------- */
+// 🔹 Step 2: Main logic
 async function main() {
-  console.log("🚀 Starting Stagehand with OAuth...");
+  console.log("🔑 Fetching API key...");
+  const apiKey = await fetchOAuthToken();
 
-  try {
-    // 1️⃣ Fetch OAuth credentials
-    const oauthConfig = await fetchOAuthConfig();
+  console.log("⚙️ Setting up custom LLM provider...");
+  const customProvider = createOpenAI({
+    apiKey,
+    baseURL: "",
+  });
 
-    // 2️⃣ Initialize Custom LLM Client
-    const rbcLLMClient = new CustomLLMClient({
-      modelName: "gpt-4o",
-      apiEndpoint: `${oauthConfig.baseURL}/chat/completions`,
-      apiKey: oauthConfig.apiKey,
-      actualModelName: "gpt-4.1-2025-04-14-eastus-dz",
-    });
+  const llmClient = new AISdkClient({
+    model: customProvider("gpt-4o-1-2025-04-14-eastus-dz"), // Change to your actual model name
+  });
 
-    // 3️⃣ Create Stagehand instance
-    const stagehand = new Stagehand({
-      env: "LOCAL",
-      llmClient: rbcLLMClient,
-      verbose: 1,
-      headless: false,
-    });
+  console.log("🚀 Launching Stagehand...");
+  const stagehand = new Stagehand({
+    env: "BROWSERBASE",
+    llmClient,
+  });
 
-    console.log("🧠 Initializing Stagehand...");
-    await stagehand.init();
+  console.log("🌐 Opening Google...");
+  await stagehand.page.goto("https://www.google.com");
 
-    const page = stagehand.page;
+  console.log("🔍 Searching for 'dog'...");
+  await stagehand.act({
+    action: "type",
+    target: { role: "textbox", name: "Search" },
+    text: "dog",
+  });
 
-    // 4️⃣ Navigate and perform actions
-    console.log("🌐 Navigating to Google...");
-    await page.goto("https://www.google.com");
-    await page.waitForLoadState("domcontentloaded");
+  await stagehand.act({
+    action: "press",
+    target: { role: "textbox", name: "Search" },
+    key: "Enter",
+  });
 
-    await safeAct(stagehand, "accept cookies");
-    await safeAct(stagehand, "type 'Stagehand LLM' into the search box");
-    await safeAct(stagehand, "press the Enter key");
+  await stagehand.page.waitForTimeout(3000);
 
-    console.log("✅ Stagehand automation completed!");
-  } catch (err) {
-    console.error("❌ Initialization error:", err);
-  }
+  console.log("✅ Search completed.");
+  await stagehand.close();
 }
 
-// Run main
-main();
+// 🔹 Execute
+main().catch((err) => console.error("❌ Error:", err));
