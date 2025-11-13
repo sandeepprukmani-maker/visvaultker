@@ -1,0 +1,340 @@
+import { spawn } from "child_process";
+import {
+  LLMClient,
+  CreateChatCompletionOptions,
+  LLMResponse,
+  AvailableModel,
+} from "browserbasehq/stagehand";
+import https from "https";
+
+export class CustomLLMClient extends LLMClient {
+  readonly type = "custom";
+  private apiEndpoint: string;
+  private apiKey: string | null; // Optional if using OAuth token
+  private actualModelName: string;
+  private oauthToken: string | null = null;
+
+  constructor({
+    modelName = "gpt-4o" as AvailableModel,
+    apiEndpoint,
+    apiKey = null,
+    actualModelName = "gpt-4o-1-2025-04-14-eastus-dz",
+  }: {
+    modelName?: AvailableModel;
+    apiEndpoint: string;
+    apiKey?: string | null;
+    actualModelName?: string;
+  }) {
+    super(modelName);
+    this.apiEndpoint = apiEndpoint;
+    this.apiKey = apiKey;
+    this.actualModelName = actualModelName;
+    this.hasVision = false;
+  }
+
+  async createChatCompletion(
+    options: CreateChatCompletionOptions
+  ): Promise<LLMResponse | any> {
+    const { messages, temperature, maxTokens, logger = () => {} } = options;
+    let retries = 3;
+
+    // Fetch OAuth token if not yet fetched
+    if (!this.oauthToken) {
+      try {
+        const tokenResponse = (await this.fetchOAuthConfig()) as { access_token: string };
+        this.oauthToken = tokenResponse.access_token;
+        logger({
+          category: "custom-lim",
+          message: `Fetched OAuth token`,
+          level: 1,
+        });
+      } catch (err) {
+        logger({
+          category: "custom-lim",
+          message: `Failed to fetch OAuth token: ${err instanceof Error ? err.message : String(err)}`,
+          level: 0,
+        });
+        throw err;
+      }
+    }
+
+    const makeRequest = () =>
+      new Promise<LLMResponse | any>((resolve, reject) => {
+        const requestPayload = {
+          model: this.actualModelName,
+          messages: messages.map((msg) => ({
+            role: msg.role,
+            content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
+          })),
+          temperature,
+          max_tokens: maxTokens,
+        };
+
+        const requestBody = JSON.stringify(requestPayload);
+
+        try {
+          const url = new URL(this.apiEndpoint);
+          const reqOptions = {
+            hostname: url.hostname,
+            port: url.port || 443,
+            path: url.pathname + url.search,
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.oauthToken}`,
+              "Content-Length": Buffer.byteLength(requestBody),
+            },
+            rejectUnauthorized: false,
+          };
+
+          const req = https.request(reqOptions, (res) => {
+            let responseData = "";
+            res.on("data", (chunk) => {
+              responseData += chunk;
+            });
+            res.on("end", () => {
+              if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                try {
+                  const data = JSON.parse(responseData);
+                  resolve(data);
+                } catch (e) {
+                  reject(new Error(`Failed to parse response: ${responseData}`));
+                }
+              } else if (res.statusCode === 401) {
+                // Token possibly expired, clear for refresh
+                this.oauthToken = null;
+                reject(new Error(`Unauthorized - token expired or invalid: ${responseData}`));
+              } else {
+                reject(
+                  new Error(`API request failed with status ${res.statusCode}: ${responseData}`)
+                );
+              }
+            });
+          });
+
+          req.on("error", (err) => reject(err));
+          req.write(requestBody);
+          req.end();
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+    while (retries > 0) {
+      try {
+        const data = await makeRequest();
+
+        // Construct LLMResponse from raw API data
+        const messageContent =
+          data?.choices?.[0]?.message?.content || data.content || "";
+        const toolCalls = data?.choices?.[0]?.message?.tool_calls;
+
+        const messageObj: any = { role: "assistant", content: messageContent };
+        if (toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0) {
+          messageObj.tool_calls = toolCalls;
+        }
+
+        const formattedResponse: LLMResponse = {
+          id: `custom-${Date.now()}`,
+          object: "chat.completion",
+          created: Math.floor(Date.now() / 1000),
+          model: this.actualModelName,
+          choices: [
+            {
+              index: 0,
+              message: messageObj,
+              finish_reason: data?.choices?.[0]?.finish_reason || "stop",
+            },
+          ],
+          usage: {
+            prompt_tokens: data?.usage?.prompt_tokens || 0,
+            completion_tokens: data?.usage?.completion_tokens || 0,
+            total_tokens: data?.usage?.total_tokens || 0,
+          },
+        };
+
+        // Optional structured parsing if requested by options.response_model
+        if (options.response_model) {
+          logger({
+            category: "custom-lim",
+            message: `Response model requested, parsing: ${messageContent}`,
+            level: 1,
+          });
+
+          try {
+            const parsedData = JSON.parse(messageContent);
+            logger({
+              category: "custom-lim",
+              message: `Parsed data: ${JSON.stringify(parsedData, null, 2)}`,
+              level: 1,
+            });
+
+            if (parsedData && typeof parsedData === "object") {
+              if (parsedData.element && parsedData.action) {
+                const elementId =
+                  parsedData.element.id?.replace(/[^\[\]1]/g, "") || "0-1";
+                const normalizedData = {
+                  elementId,
+                  method: parsedData.action,
+                  arguments: parsedData.argument
+                    ? [parsedData.argument]
+                    : parsedData.arguments || [],
+                };
+                logger({
+                  category: "custom-lim",
+                  message: `Normalized data (element/action): ${JSON.stringify(
+                    normalizedData,
+                    null,
+                    2
+                  )}`,
+                  level: 1,
+                });
+                return {
+                  data: normalizedData,
+                  usage: formattedResponse.usage,
+                };
+              }
+              if (parsedData.elementId && parsedData.action) {
+                const normalizedData = {
+                  elementId: parsedData.elementId,
+                  method: parsedData.action,
+                  arguments: parsedData.argument
+                    ? [parsedData.argument]
+                    : parsedData.arguments || [],
+                };
+                logger({
+                  category: "custom-lim",
+                  message: `Normalized data (elementId/action): ${JSON.stringify(
+                    normalizedData,
+                    null,
+                    2
+                  )}`,
+                  level: 1,
+                });
+                return {
+                  data: normalizedData,
+                  usage: formattedResponse.usage,
+                };
+              }
+            }
+            return { data: parsedData, usage: formattedResponse.usage };
+          } catch (e) {
+            logger({
+              category: "custom-lim",
+              message: `Failed to parse JSON: ${e instanceof Error ? e.message : String(e)}`,
+              level: 1,
+            });
+
+            const jsonMatch = messageContent.match(/[\[{][\s\S]*[\]}]/);
+            if (jsonMatch) {
+              try {
+                const extractedJson = JSON.parse(jsonMatch[0]);
+                logger({
+                  category: "custom-lim",
+                  message: `Extracted JSON: ${JSON.stringify(extractedJson, null, 2)}`,
+                  level: 1,
+                });
+                if (extractedJson.element && extractedJson.action) {
+                  const elementId =
+                    extractedJson.element.id?.replace(/[^\[\]1]/g, "") || "0-1";
+                  const normalizedData = {
+                    elementId,
+                    method: extractedJson.action,
+                    arguments: extractedJson.argument
+                      ? [extractedJson.argument]
+                      : extractedJson.arguments || [],
+                  };
+                  logger({
+                    category: "custom-lim",
+                    message: `Normalized data (extracted): ${JSON.stringify(
+                      normalizedData,
+                      null,
+                      2
+                    )}`,
+                    level: 1,
+                  });
+                  return {
+                    data: normalizedData,
+                    usage: formattedResponse.usage,
+                  };
+                }
+                return { data: extractedJson, usage: formattedResponse.usage };
+              } catch (e2) {
+                logger({
+                  category: "custom-lim",
+                  message: `Extraction also failed: ${
+                    e2 instanceof Error ? e2.message : String(e2)
+                  }`,
+                  level: 1,
+                });
+              }
+            }
+          }
+        }
+
+        return formattedResponse;
+      } catch (error) {
+        if (error.message.includes("Unauthorized")) {
+          retries--;
+          if (retries === 0) throw error;
+          try {
+            const tokenResponse = (await this.fetchOAuthConfig()) as { access_token: string };
+            this.oauthToken = tokenResponse.access_token;
+            logger({
+              category: "custom-lim",
+              message: `Refreshed OAuth token after unauthorized error`,
+              level: 1,
+            });
+          } catch (tokenError) {
+            logger({
+              category: "custom-lim",
+              message: `Failed to refresh OAuth token: ${
+                tokenError instanceof Error ? tokenError.message : String(tokenError)
+              }`,
+              level: 0,
+            });
+            throw tokenError;
+          }
+        } else {
+          retries--;
+          logger({
+            category: "custom-lim",
+            message: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            level: 0,
+          });
+          if (retries <= 0) throw error;
+        }
+      }
+    }
+  }
+
+  async fetchOAuthConfig(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const pythonProcess = spawn("python", ["fetch_token.py"]);
+      let output = "";
+      let errorOutput = "";
+      pythonProcess.stdout.on("data", (data) => {
+        output += data.toString();
+      });
+      pythonProcess.stderr.on("data", (data) => {
+        errorOutput += data.toString();
+      });
+      pythonProcess.on("close", (code) => {
+        if (code !== 0) {
+          reject(new Error(`Python script failed: ${errorOutput}`));
+        } else {
+          try {
+            const result = JSON.parse(output.trim());
+            if (result.error) {
+              reject(new Error(`OAuth error: ${result.error}`));
+            } else {
+              resolve(result);
+            }
+          } catch (e) {
+            reject(new Error(`Failed to parse OAuth response: ${output}`));
+          }
+        }
+      });
+    });
+  }
+}
