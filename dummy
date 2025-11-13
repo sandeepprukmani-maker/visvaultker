@@ -1,81 +1,51 @@
-import { spawn } from "child_process";
-import { Stagehand, AISdkClient } from "browserbasehq/stagehand";
-import { createOpenAI } from "@ai-sdk/openai";
+async createChatCompletion(
+  options: CreateChatCompletionOptions
+): Promise<LLMResponse> {
+  const { messages, temperature, maxTokens, logger, response_model } = options;
 
-// 🔹 Step 1: Fetch token from Python
-async function fetchOAuthToken(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const python = spawn("python", ["fetch_token.py"]);
+  try {
+    // … build requestPayload …
+    const data = await …;
 
-    let output = "";
-    let errorOutput = "";
+    const messageContent = data.choices?.[0]?.message?.content || "";
 
-    python.stdout.on("data", (data) => {
-      output += data.toString();
-    });
-
-    python.stderr.on("data", (data) => {
-      errorOutput += data.toString();
-    });
-
-    python.on("close", (code) => {
-      if (code !== 0) {
-        reject(new Error(`fetch_token.py failed: ${errorOutput}`));
-      } else {
-        try {
-          const result = JSON.parse(output.trim());
-          if (result.error) reject(new Error(result.error));
-          else resolve(result.api_key);
-        } catch (err) {
-          reject(new Error(`Failed to parse fetch_token.py output: ${output}`));
+    const response: LLMResponse = {
+      id: `custom-${Date.now()}`,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: this.actualModelName,
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant",
+            content: messageContent,
+            ...(data.choices?.[0]?.message?.tool_calls ? { tool_calls: data.choices[0].message.tool_calls } : {})
+          },
+          finish_reason: data.choices?.[0]?.finish_reason || "stop",
         }
+      ],
+      usage: {
+        prompt_tokens: data.usage?.prompt_tokens ?? 0,
+        completion_tokens: data.usage?.completion_tokens ?? 0,
+        total_tokens: data.usage?.total_tokens ?? 0,
       }
-    });
-  });
+    };
+
+    if (response_model) {
+      try {
+        const parsed = JSON.parse(messageContent);
+        response.choices[0].message.content = JSON.stringify(parsed);
+        return response;
+      } catch (err) {
+        logger({ category: "custom-llm", message: `Failed JSON parse: ${String(err)}`, level: 0 });
+        throw new Error(`Invalid JSON response: ${messageContent}`);
+      }
+    }
+
+    return response;
+  } catch (err) {
+    logger({ category: "custom-llm", message: `Error: ${String(err)}`, level: 0 });
+    throw err;
+  }
 }
-
-// 🔹 Step 2: Main logic
-async function main() {
-  console.log("🔑 Fetching API key...");
-  const apiKey = await fetchOAuthToken();
-
-  console.log("⚙️ Setting up custom LLM provider...");
-  const customProvider = createOpenAI({
-    apiKey,
-    baseURL: "",
-  });
-
-  const llmClient = new AISdkClient({
-    model: customProvider("gpt-4o-1-2025-04-14-eastus-dz"), // Change to your actual model name
-  });
-
-  console.log("🚀 Launching Stagehand...");
-  const stagehand = new Stagehand({
-    env: "BROWSERBASE",
-    llmClient,
-  });
-
-  console.log("🌐 Opening Google...");
-  await stagehand.page.goto("https://www.google.com");
-
-  console.log("🔍 Searching for 'dog'...");
-  await stagehand.act({
-    action: "type",
-    target: { role: "textbox", name: "Search" },
-    text: "dog",
-  });
-
-  await stagehand.act({
-    action: "press",
-    target: { role: "textbox", name: "Search" },
-    key: "Enter",
-  });
-
-  await stagehand.page.waitForTimeout(3000);
-
-  console.log("✅ Search completed.");
-  await stagehand.close();
-}
-
-// 🔹 Execute
-main().catch((err) => console.error("❌ Error:", err));
