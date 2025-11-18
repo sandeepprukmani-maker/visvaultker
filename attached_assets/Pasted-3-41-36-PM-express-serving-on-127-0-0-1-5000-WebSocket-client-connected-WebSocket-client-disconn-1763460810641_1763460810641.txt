@@ -1,0 +1,66 @@
+3:41:36 PM [express] serving on 127.0.0.1:5000
+WebSocket client connected
+WebSocket client disconnected
+3:41:43 PM [express] GET /api/settings 200 in 2ms :: {"id":"f28d2881-e83a-4245-9148-9d95e26f35f2","s…
+3:41:43 PM [express] GET /api/automations 200 in 1ms :: []
+3:41:43 PM [express] GET /api/cache 304 in 1ms :: []
+WebSocket client connected
+[2025-11-18 15:41:53.964 +0530] ERROR: No known environment variable for provider 'gpt-4o-mini'
+    category: "init"
+[2025-11-18 15:41:53.969 +0530] INFO: Launching local browser                                                                                                                                                                       
+    category: "init"
+3:41:57 PM [express] GET /api/automations 200 in 1ms :: [{"prompt":"open google search for dogs","st…
+[2025-11-18 15:41:57.137 +0530] INFO: action, checking for page navigation
+    category: "action"
+    xpath: "xpath=/html"
+[2025-11-18 15:41:57.141 +0530] INFO: no new (frame) URL detected                                                                                                                                                                   
+    category: "action"
+    url: "about:blank"
+[2025-11-18 15:42:18.914 +0530] ERROR: No known environment variable for provider 'gpt-4o-mini'
+    category: "init"
+[2025-11-18 15:42:18.914 +0530] INFO: Launching local browser                                                                                                                                                                       
+    category: "init"
+[2025-11-18 15:42:48.890 +0530] INFO: action, checking for page navigation
+    category: "action"
+    xpath: "xpath=/html[1]"
+[2025-11-18 15:42:48.895 +0530] INFO: no new (frame) URL detected                                                                                                                                                                   
+    category: "action"
+    url: "about:blank"
+[2025-11-18 15:42:50.554 +0530] INFO: error filling element
+    category: "action"
+    xpath: "xpath=/html[1]"
+    error: "InvalidArgumentError: Failed to fill element (unsupported-element)"
+[2025-11-18 15:42:50.554 +0530] INFO: error performing method                                                                                                                                                                       
+    category: "action"
+    trace: "UnderstudyCommandException: InvalidArgumentError: Failed to fill element (unsupported-element)\n    at C:\Users\Sandeep\PycharmProjects\visionvault\node_modules\@browserbasehq\stagehand\dist\index.js:10236:13\n    at Generator.throw (<anonymous>)\n    at rejected (C:\Users\Sandeep\PycharmProjects\visionvault\node_modules\@browserbasehq\stagehand\dist\index.js:74:29)"
+    method: "fill"
+    xpath: "xpath=/html[1]"
+    args: [
+      "dogs"
+    ]
+    error: "InvalidArgumentError: Failed to fill element (unsupported-element)"
+[2025-11-18 15:42:50.555 +0530] INFO: Error performing action. Reprocessing the page and trying again                                                                                                                               
+    category: "action"
+    action: {
+      "description": "The main HTML area of the page where the user can interact with elements such as links and buttons.",
+      "method": "fill",
+      "arguments": [
+        "dogs"
+      ],
+      "selector": "xpath=/html[1]"
+    }
+    error: "InvalidArgumentError: Failed to fill element (unsupported-element)"
+3:42:52 PM [express] GET /api/automations 200 in 1ms :: [{"prompt":"open google.com search for dogs"…
+[2025-11-18 15:42:52.545 +0530] INFO: error filling element
+    category: "action"
+    xpath: "xpath=/html[1]"
+    error: "InvalidArgumentError: Failed to fill element (unsupported-element)"
+[2025-11-18 15:42:52.546 +0530] INFO: error performing method                                                                                                                                                                       
+    category: "action"
+    trace: "UnderstudyCommandException: InvalidArgumentError: Failed to fill element (unsupported-element)\n    at C:\Users\Sandeep\PycharmProjects\visionvault\node_modules\@browserbasehq\stagehand\dist\index.js:10236:13\n    at Generator.throw (<anonymous>)\n    at rejected (C:\Users\Sandeep\PycharmProjects\visionvault\node_modules\@browserbasehq\stagehand\dist\index.js:74:29)"
+    method: "fill"
+    xpath: "xpath=/html[1]"
+    args: [
+      "dogs"
+    ]
+    error: "InvalidArgumentError: Failed to fill element (unsupported-element)"
