@@ -1,0 +1,114 @@
+3:46:15 PM [express] serving on 127.0.0.1:5000
+WebSocket client connected
+WebSocket client disconnected
+3:46:26 PM [express] GET /api/settings 200 in 2ms :: {"id":"3dc08ac1-d023-475d-b3c6-c8ec2f835ecc","s…
+3:46:26 PM [express] GET /api/automations 200 in 1ms :: []
+WebSocket client connected
+3:46:26 PM [express] GET /api/cache 304 in 1ms :: []
+[2025-11-18 15:46:30.099 +0530] INFO: Launching local browser
+    category: "init"
+[2025-11-18 15:46:34.075 +0530] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "elementId": "0-2",
+        "description": "The main HTML area of the page where the search input and other elements are located.",
+        "method": "click",
+        "arguments": [],
+        "twoStep": true
+      },
+      "usage": {
+        "inputTokens": 789,
+        "outputTokens": 40,
+        "totalTokens": 829,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+[2025-11-18 15:46:34.099 +0530] INFO: action, checking for page navigation                                                                                                                                                          
+    category: "action"
+    xpath: "xpath=/html[1]"
+[2025-11-18 15:46:34.103 +0530] INFO: no new (frame) URL detected                                                                                                                                                                   
+    category: "action"
+    url: "about:blank"
+[2025-11-18 15:46:36.957 +0530] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "elementId": "0-2",
+        "description": "The main HTML area of the page where the search input and other elements are located.",
+        "method": "fill",
+        "arguments": [
+          "dogs"
+        ],
+        "twoStep": true
+      },
+      "usage": {
+        "inputTokens": 624,
+        "outputTokens": 42,
+        "totalTokens": 666,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+[2025-11-18 15:46:36.973 +0530] INFO: error filling element                                                                                                                                                                         
+    category: "action"
+    xpath: "xpath=/html[1]"
+    error: "InvalidArgumentError: Failed to fill element (unsupported-element)"
+[2025-11-18 15:46:36.973 +0530] INFO: error performing method                                                                                                                                                                       
+    category: "action"
+    trace: "UnderstudyCommandException: InvalidArgumentError: Failed to fill element (unsupported-element)\n    at C:\Users\Sandeep\PycharmProjects\visionvault\node_modules\@browserbasehq\stagehand\dist\index.js:10236:13\n    at Generator.throw (<anonymous>)\n    at rejected (C:\Users\Sandeep\PycharmProjects\visionvault\node_modules\@browserbasehq\stagehand\dist\index.js:74:29)"
+    method: "fill"
+    xpath: "xpath=/html[1]"
+    args: [
+      "dogs"
+    ]
+    error: "InvalidArgumentError: Failed to fill element (unsupported-element)"
+[2025-11-18 15:46:36.973 +0530] INFO: Error performing action. Reprocessing the page and trying again                                                                                                                               
+    category: "action"
+    action: {
+      "description": "The main HTML area of the page where the search input and other elements are located.",
+      "method": "fill",
+      "arguments": [
+        "dogs"
+      ],
+      "selector": "xpath=/html[1]"
+    }
+    error: "InvalidArgumentError: Failed to fill element (unsupported-element)"
+[2025-11-18 15:46:38.482 +0530] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "elementId": "0-1",
+        "description": "The main HTML area of the page where the search input and other elements are located.",
+        "method": "fill",
+        "arguments": [
+          ""
+        ],
+        "twoStep": false
+      },
+      "usage": {
+        "inputTokens": 800,
+        "outputTokens": 41,
+        "totalTokens": 841,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+[2025-11-18 15:46:38.498 +0530] INFO: error filling element                                                                                                                                                                         
+    category: "action"
+    xpath: "xpath=/html"
+    error: "InvalidArgumentError: Failed to fill element (unsupported-element)"
+[2025-11-18 15:46:38.498 +0530] INFO: error performing method                                                                                                                                                                       
+    category: "action"
+    trace: "UnderstudyCommandException: InvalidArgumentError: Failed to fill element (unsupported-element)\n    at C:\Users\Sandeep\PycharmProjects\visionvault\node_modules\@browserbasehq\stagehand\dist\index.js:10236:13\n    at Generator.throw (<anonymous>)\n    at rejected (C:\Users\Sandeep\PycharmProjects\visionvault\node_modules\@browserbasehq\stagehand\dist\index.js:74:29)"
+    method: "fill"
+    xpath: "xpath=/html"
+    args: [
+      "dogs"
+    ]
+    error: "InvalidArgumentError: Failed to fill element (unsupported-element)"
+3:46:38 PM [express] GET /api/automations 200 in 1ms :: [{"prompt":"open google.com search for dogs"…
