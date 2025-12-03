@@ -1,6 +1,3 @@
-import dotenv from "dotenv";
-dotenv.config();
-
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -90,8 +87,8 @@ app.use((req, res, next) => {
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
-      port: "7800",
-      host: "127.0.0.1",
+      port,
+      host: "0.0.0.0",
       reusePort: true,
     },
     () => {

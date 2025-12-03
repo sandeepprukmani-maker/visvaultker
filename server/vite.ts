@@ -9,6 +9,12 @@ import { nanoid } from "nanoid";
 const viteLogger = createLogger();
 
 export async function setupVite(server: Server, app: Express) {
+  const serverOptions = {
+    middlewareMode: true,
+    hmr: { server, path: "/vite-hmr" },
+    allowedHosts: true as const,
+  };
+
   const vite = await createViteServer({
     ...viteConfig,
     configFile: false,
@@ -19,16 +25,7 @@ export async function setupVite(server: Server, app: Express) {
         process.exit(1);
       },
     },
-    server: {
-      middlewareMode: true,
-      hmr: {
-        protocol: "ws",
-        host: "localhost", // <-- Windows-friendly
-        port: 24678,       // optional HMR port
-        clientPort: 24678, // optional, same as above
-      },
-      allowedHosts: true,
-    },
+    server: serverOptions,
     appType: "custom",
   });
 
@@ -45,12 +42,12 @@ export async function setupVite(server: Server, app: Express) {
         "index.html",
       );
 
+      // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`
+        `src="/src/main.tsx?v=${nanoid()}"`,
       );
-
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
