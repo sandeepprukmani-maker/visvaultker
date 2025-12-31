@@ -60,10 +60,10 @@ export default function Home() {
           <div className="flex items-center justify-between border-b pb-4">
             <div>
               <h2 className="text-3xl font-display font-bold">Content Library</h2>
-              <p className="text-muted-foreground mt-1">Your generated social media assets</p>
+              <p className="text-muted-foreground mt-1">Your generated social media captions</p>
             </div>
             <div className="text-sm text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full">
-              {posters?.length || 0} Assets Created
+              {posters?.length || 0} Captions Created
             </div>
           </div>
 
