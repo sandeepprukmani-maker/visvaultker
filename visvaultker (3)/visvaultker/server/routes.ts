@@ -114,7 +114,7 @@ export async function registerRoutes(
         messages: [
           {
             role: "system",
-            content: "You are a social media marketing expert for a mortgage company. Create a very short, catchy, and positive Instagram caption. Analyze the news with a focus on opportunities for homebuyers and refinancers, avoiding any panic-inducing language. Weave in current market rates contextually. Max 150 characters. Use 1 emoji."
+            content: "You are a social media marketing expert for a mortgage company. Create a very short, catchy, and positive Instagram caption. Analyze the news with a focus on opportunities for homebuyers and refinancers, avoiding any panic-inducing language. Weave in current market rates contextually. Max 150 characters. Use 1 emoji. Do NOT include any hashtags."
           },
           {
             role: "user",
