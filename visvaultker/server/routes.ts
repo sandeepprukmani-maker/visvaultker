@@ -1,6 +1,10 @@
+import OpenAI from "openai";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
+import { posters, videos } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 import { fetchLatestRateNews, fetchCurrentRates } from "./lib/rss";
 import { openai as openaiClient } from "./replit_integrations/image/client";
 import { api } from "@shared/routes";
@@ -8,7 +12,13 @@ import { z } from "zod";
 
 // Import integration routes
 import { registerChatRoutes } from "./replit_integrations/chat";
+import { registerAudioRoutes } from "./replit_integrations/audio";
 import { registerImageRoutes } from "./replit_integrations/image";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -16,6 +26,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Register integration routes
   registerChatRoutes(app);
+  registerAudioRoutes(app);
   registerImageRoutes(app);
 
   // --- API Routes ---
@@ -275,5 +286,111 @@ export async function registerRoutes(
     }
   });
 
+  
+  app.post("/api/generate-video", async (req, res) => {
+    try {
+      const { postId } = req.body;
+      const latestPost = await storage.getPost(parseInt(postId));
+      if (!latestPost) throw new Error("Post not found");
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are a mortgage marketing expert. Rephrase the following news into a punchy 15-second social media script (under 250 characters). Focus on the impact for home buyers."
+          },
+          { role: "user", content: latestPost.content || latestPost.title }
+        ],
+      });
+
+      const script = response.choices[0].message.content || "";
+
+      console.log("Generating video with script:", script.substring(0, 50) + "...");
+      const heygenResponse = await fetch("https://api.heygen.com/v2/video/generate", {
+        method: "POST",
+        headers: {
+          "X-Api-Key": process.env.HEYGEN_API_KEY || "",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          video_inputs: [
+            {
+              character: {
+                type: "avatar",
+                avatar_id: process.env.HEYGEN_AVATAR_ID,
+                avatar_style: "normal"
+              },
+              voice: {
+                type: "text",
+                input_text: script,
+                voice_id: "7df8d935368b477698024e6a3ba84d0e"
+              }
+            }
+          ],
+          dimension: {
+            width: 720,
+            height: 1280
+          }
+        }),
+      });
+
+      if (!heygenResponse.ok) {
+        const error = await heygenResponse.text();
+        throw new Error(`HeyGen API error: ${error}`);
+      }
+
+      const heygenData = await heygenResponse.json();
+      
+      const [newVideo] = await db.insert(videos).values({
+        postId: parseInt(postId),
+        videoId: heygenData.data.video_id,
+        status: "processing",
+        script: script
+      }).returning();
+
+      res.json({ video_id: heygenData.data.video_id, script, id: newVideo.id });
+    } catch (error: any) {
+      console.error("Video generation error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/videos", async (req, res) => {
+    try {
+      const allVideos = await db.select().from(videos).orderBy(desc(videos.createdAt));
+      res.json(allVideos);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/video-status/:id", async (req, res) => {
+    try {
+      const response = await fetch(`https://api.heygen.com/v2/video_status.get?video_id=${req.params.id}`, {
+        headers: { "X-Api-Key": process.env.HEYGEN_API_KEY || "" },
+      });
+      
+      const data = await response.json();
+      
+      if (data.data && data.data.status) {
+        let dbStatus = "processing";
+        if (data.data.status === "completed") dbStatus = "completed";
+        if (data.data.status === "failed") dbStatus = "failed";
+        
+        await db.update(videos)
+          .set({ 
+            status: dbStatus,
+            videoUrl: data.data.video_url || null,
+            thumbnailUrl: data.data.thumbnail_url || null
+          })
+          .where(eq(videos.videoId, req.params.id));
+      }
+      
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
   return httpServer;
 }

@@ -22,10 +22,22 @@ export const posters = pgTable("posters", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const videos = pgTable("videos", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").references(() => posts.id).notNull(),
+  videoId: text("video_id").notNull(), // HeyGen video ID
+  status: text("status").notNull().default("processing"), // processing, completed, failed
+  videoUrl: text("video_url"),
+  thumbnailUrl: text("thumbnail_url"),
+  script: text("script"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === SCHEMAS ===
 
 export const insertPostSchema = createInsertSchema(posts).omit({ id: true, createdAt: true });
 export const insertPosterSchema = createInsertSchema(posters).omit({ id: true, createdAt: true });
+export const insertVideoSchema = createInsertSchema(videos).omit({ id: true, createdAt: true });
 
 // === TYPES ===
 
@@ -34,6 +46,9 @@ export type InsertPost = z.infer<typeof insertPostSchema>;
 
 export type Poster = typeof posters.$inferSelect;
 export type InsertPoster = z.infer<typeof insertPosterSchema>;
+
+export type Video = typeof videos.$inferSelect;
+export type InsertVideo = z.infer<typeof insertVideoSchema>;
 
 // Request types
 export type GeneratePosterRequest = {

@@ -1,5 +1,6 @@
 import { useLatestPost, usePosters } from "@/hooks/use-posts";
 import { LatestNewsCard } from "@/components/LatestNewsCard";
+import { ContentLibrary } from "@/components/ContentLibrary";
 import { PosterGallery } from "@/components/PosterGallery";
 import { Header } from "@/components/Header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -82,6 +83,10 @@ export default function Home() {
           ) : null}
         </section>
       </main>
-    </div>
+    
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold tracking-tight mb-4">Video Content Library</h2>
+          <ContentLibrary />
+        </div></div>
   );
 }
