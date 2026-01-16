@@ -1,8 +1,10 @@
-# Visvaultker - Mortgage Pulse Application
+# Stagehand UI
 
 ## Overview
 
-This is a full-stack mortgage market intelligence application called "Mortgage Pulse." It fetches real-time mortgage rate news from RSS feeds (Mortgage News Daily), stores articles in a PostgreSQL database, and generates AI-powered social media captions for loan officers. The app provides a dashboard showing the latest market updates and a gallery of generated captions.
+Stagehand UI is a web automation platform that allows users to describe tasks in plain English, which are then executed by a headless browser using the Stagehand library. The application provides a dashboard interface for creating, monitoring, and reviewing browser automation tasks with real-time logging and screenshot capture capabilities.
+
+The system uses a custom OpenAI-compatible provider (RBC internal endpoint) with Claude Sonnet 4.5 model and OAuth token authentication.
 
 ## User Preferences
 
@@ -11,88 +13,58 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Frontend Architecture
-
 - **Framework**: React 18 with TypeScript
 - **Routing**: Wouter (lightweight React router)
-- **Styling**: Tailwind CSS with shadcn/ui component library (New York style)
 - **State Management**: TanStack React Query for server state
-- **Animations**: Framer Motion for smooth UI transitions
-- **Build Tool**: Vite with React plugin
+- **Styling**: Tailwind CSS with shadcn/ui component library
+- **Animations**: Framer Motion for page transitions and UI animations
+- **Build Tool**: Vite with custom Replit plugins
 
-The frontend follows a component-based architecture with:
-- Pages in `client/src/pages/`
-- Reusable UI components in `client/src/components/ui/` (shadcn/ui)
-- Custom components in `client/src/components/`
-- Custom hooks in `client/src/hooks/`
-- Path aliases: `@/` maps to `client/src/`, `@shared/` maps to `shared/`
+The frontend follows a page-based structure with shared components. Key pages include:
+- Home dashboard for creating automations and viewing history
+- Automation detail page with real-time log streaming and results display
 
 ### Backend Architecture
+- **Runtime**: Node.js with Express
+- **Language**: TypeScript (ESM modules)
+- **API Pattern**: RESTful endpoints defined in `shared/routes.ts` with Zod validation
+- **Browser Automation**: Stagehand library with custom LLM client
 
-- **Framework**: Express.js with TypeScript
-- **Runtime**: Node.js with TSX for TypeScript execution
-- **API Pattern**: RESTful endpoints under `/api/`
-- **Database ORM**: Drizzle ORM with PostgreSQL
-- **Schema Location**: `shared/schema.ts` for database models
-
-Key backend modules:
-- `server/routes.ts` - API route definitions
-- `server/storage.ts` - Database access layer (repository pattern)
-- `server/db.ts` - Database connection setup
-- `server/lib/rss.ts` - RSS feed parsing for mortgage news
+The backend uses a clean separation between route handlers (`server/routes.ts`), business logic (`server/stagehand.ts`), and data access (`server/storage.ts`).
 
 ### Data Storage
-
 - **Database**: PostgreSQL via Drizzle ORM
-- **Schema Definitions**: Located in `shared/schema.ts`
+- **Schema Location**: `shared/schema.ts`
 - **Tables**:
-  - `posts` - Stores fetched mortgage news articles (title, link, content, pubDate, guid)
-  - `posters` - Stores generated social media captions linked to posts
-  - `conversations` / `messages` - Chat functionality for AI conversations
-
-### AI Integrations
-
-The app includes pre-built AI integration modules in `server/replit_integrations/`:
-- **Chat**: OpenAI-powered chat with conversation persistence
-- **Image**: Image generation using gpt-image-1 model
-- **Batch**: Rate-limited batch processing utilities for LLM operations
-
-These integrations use environment variables:
-- `AI_INTEGRATIONS_OPENAI_API_KEY`
-- `AI_INTEGRATIONS_OPENAI_BASE_URL`
+  - `automations`: Stores automation tasks with prompt, status, result, screenshot, and error fields
+  - `automation_logs`: Real-time log entries linked to automations
 
 ### API Structure
+Routes are defined declaratively in `shared/routes.ts` with Zod schemas for type safety:
+- `GET /api/automations` - List all automations
+- `POST /api/automations` - Create and start new automation
+- `GET /api/automations/:id` - Get automation with logs
+- `GET /api/automations/:id/logs` - Get logs only
 
-Defined in `shared/routes.ts` using Zod for type safety:
-- `GET /api/posts/latest` - Fetch latest mortgage news (with RSS upsert)
-- `GET /api/posts` - List all posts
-- `POST /api/posters` - Generate social media caption for a post
-- `GET /api/posters` - List all generated captions
-
-### Build Process
-
-- **Development**: `npm run dev` - Uses Vite dev server with HMR
-- **Production Build**: `npm run build` - Bundles frontend with Vite, backend with esbuild
-- **Database Migrations**: `npm run db:push` - Drizzle Kit push to database
+### Authentication Flow
+OAuth token retrieval is handled via a Python script (`fetch_token.py`) that outputs JSON with an access token. This is invoked from Node.js using child process spawn.
 
 ## External Dependencies
 
-### Database
-- PostgreSQL (required via `DATABASE_URL` environment variable)
-- Drizzle ORM for schema management and queries
-- connect-pg-simple for session storage
+### Third-Party Services
+- **Custom LLM Provider**: RBC internal endpoint (`https://perf-apigw-int.saifg.rbc.com/JLCO/llm-control-stack/v1`)
+- **Model**: Claude Sonnet 4.5
 
-### AI Services
-- OpenAI API (for chat and image generation)
-- Configured via Replit AI Integrations
+### Required Environment Variables
+- `DATABASE_URL`: PostgreSQL connection string
+- `CHROME_PATH`: Path to Chromium/Chrome executable
 
-### External Data Sources
-- Mortgage News Daily RSS feed (https://www.mortgagenewsdaily.com/rss/rates)
-- Rate scraping from mortgagenewsdaily.com
+### Key npm Dependencies
+- `@browserbasehq/stagehand`: Browser automation framework
+- `ai-sdk` & `@ai-sdk/openai`: AI SDK for custom model integration
+- `drizzle-orm` + `drizzle-kit`: Database ORM and migrations
+- `@tanstack/react-query`: Server state management
+- `framer-motion`: Animation library
 
-### Key NPM Packages
-- `rss-parser` - RSS feed parsing
-- `date-fns` - Date formatting
-- `framer-motion` - Animations
-- `lucide-react` - Icons
-- `zod` - Schema validation
-- Full shadcn/ui component set via Radix primitives
+### Database Migrations
+Run `npm run db:push` to sync schema changes to the database using Drizzle Kit.
