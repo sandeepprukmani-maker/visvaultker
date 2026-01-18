@@ -1,22 +1,10 @@
 modules = ["nodejs-20", "web", "postgresql-16"]
-run = "npm run dev"
-hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
+[agent]
+expertMode = true
+integrations = ["javascript_openai_ai_integrations:2.0.0"]
 
 [nix]
-channel = "stable-24_05"
-packages = ["chromium", "nss", "atk", "at-spi2-atk", "pango", "cairo", "xorg.libxcb", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libXrender", "xorg.libXtst", "xorg.libXcursor", "xorg.libXi", "xorg.libXinerama", "xorg.libXScrnSaver", "xorg.libXv", "xorg.libXxf86vm", "xorg.libXaw", "xorg.libXmu", "xorg.libXpm", "xorg.libXp", "xorg.libXdmcp", "xorg.libXau", "xorg.libXft", "xorg.libXres", "sqlite"]
-
-[[ports]]
-localPort = 5000
-externalPort = 80
-
-[env]
-PORT = "5000"
-
-[deployment]
-deploymentTarget = "autoscale"
-run = ["node", "./dist/index.cjs"]
-build = ["npm", "run", "build"]
+channel = "stable-25_05"
 
 [workflows]
 runButton = "Project"
@@ -28,21 +16,24 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Start application"
+args = "devserver"
 
 [[workflows.workflow]]
-name = "Start application"
+name = "devserver"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "cd visvaultker && npm run dev"
 waitForPort = 5000
 
-[agent]
-integrations = ["javascript_openai_ai_integrations:2.0.0"]
+[workflows.workflow.metadata]
+outputType = "webview"
 
-[userenv]
+[[ports]]
+localPort = 5000
+externalPort = 80
 
-[userenv.shared]
-CHROME_PATH = "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium"
+[deployment]
+deploymentTarget = "autoscale"
+run = ["bash", "-c", "cd visvaultker && npm run start"]
