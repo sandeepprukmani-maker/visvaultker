@@ -9,10 +9,15 @@ import OpenAI from "openai";
 
 const parseXml = promisify(parseString);
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+function getOpenAIClient(): OpenAI {
+  if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+    throw new Error("OpenAI API key not configured. Please set up AI integrations.");
+  }
+  return new OpenAI({
+    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  });
+}
 
 const HEYGEN_API_KEY = process.env.HEYGEN_API_KEY;
 const AVATAR_ID = "15141bd577c043cea1d58609abf55a74";
@@ -55,7 +60,7 @@ export async function registerRoutes(
     try {
       const input = api.rss.rephrase.input.parse(req.body);
       
-      const prompt = `You are a marketing expert for the real estate and mortgage industry. 
+    const prompt = `You are a marketing expert for the real estate and mortgage industry. 
 Take the following mortgage rate news and rephrase it as an engaging, strategic marketing message specifically targeting first-time home buyers and refinancers.
 
 Focus on:
@@ -64,14 +69,14 @@ Focus on:
 - Clear, actionable next steps they should consider
 - Creating urgency while remaining professional and trustworthy
 
-Make it compelling, actionable, and professional. Keep it concise (under 200 words) and suitable for a video script that will be spoken by an AI avatar.
+Make it compelling, actionable, and professional. Keep it concise (approximately 100-120 words) and suitable for a video script that will be spoken by an AI avatar. The total duration of the spoken script should be approximately 40 seconds.
 
 Title: ${input.title}
 Description: ${input.description}
 
 Write the marketing script that can be spoken directly. Do not include any stage directions or formatting - just the spoken words.`;
 
-      const completion = await openai.chat.completions.create({
+      const completion = await getOpenAIClient().chat.completions.create({
         model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
         max_completion_tokens: 500,
@@ -119,7 +124,7 @@ Write the marketing script that can be spoken directly. Do not include any stage
             voice: {
               type: "text",
               input_text: input.marketingScript,
-              voice_id: "2d5b0e6cf36f460aa7fc47e3eee4ba54",
+              voice_id: "D5e61LbU1mWzmUL9BtQZ",
               speed: 1.0,
               pitch: 0,
             },
@@ -132,8 +137,8 @@ Write the marketing script that can be spoken directly. Do not include any stage
           },
         ],
         dimension: {
-          width: 1280,
-          height: 720,
+          width: 720,
+          height: 1280,
         },
       };
 
@@ -175,7 +180,7 @@ Write the marketing script that can be spoken directly. Do not include any stage
   });
 
   // Get video status from HeyGen
-  app.get(api.videos.getStatus.path, async (req, res) => {
+  app.get(api.videos.getStatus.path, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const video = await storage.getVideo(id);
