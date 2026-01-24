@@ -1,17 +1,21 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Video, Download, RefreshCw, Sparkles, TrendingUp } from "lucide-react";
+import { Loader2, Video, Download, RefreshCw, Sparkles, TrendingUp, Upload, Image as ImageIcon } from "lucide-react";
 import type { RSSItem, VideoResponse } from "@shared/routes";
+import { KeyManagement } from "@/components/key-management";
 
 export default function Home() {
   const { toast } = useToast();
   const [marketingScript, setMarketingScript] = useState<string>("");
   const [isRephrasing, setIsRephrasing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [bannerUrl, setBannerUrl] = useState<string>("/banners/current_banner.png");
 
   // Fetch latest RSS item
   const { data: rssItem, isLoading: rssLoading, refetch: refetchRss } = useQuery<RSSItem>({
@@ -22,6 +26,39 @@ export default function Home() {
   const { data: videos, isLoading: videosLoading } = useQuery<VideoResponse[]>({
     queryKey: ["/api/videos"],
   });
+
+  const handleUploadBanner = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("banner", file);
+
+    setIsUploading(true);
+    try {
+      const response = await fetch("/api/banners/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Upload failed");
+
+      const data = await response.json();
+      setBannerUrl(`${data.url}?t=${Date.now()}`); // Cache bust
+      toast({
+        title: "Banner updated",
+        description: "Your new banner will be used for all future videos.",
+      });
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: "There was an error uploading your banner.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Rephrase mutation
   const rephraseMutation = useMutation({
@@ -101,7 +138,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl md:text-4xl font-bold flex items-center justify-center gap-3">
@@ -114,160 +151,225 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Latest News Section */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Latest Mortgage Rate News
-              </CardTitle>
-              <CardDescription>
-                Fetched from mortgagenewsdaily.com/rss/rates
-              </CardDescription>
-            </div>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={handleRefresh}
-              disabled={rssLoading}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className={`h-4 w-4 ${rssLoading ? "animate-spin" : ""}`} />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {rssLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-2/3" />
-              </div>
-            ) : rssItem ? (
-              <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="space-y-8">
+            <KeyManagement />
+            
+            {/* Banner Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5 text-primary" />
+                  Promotional Banner
+                </CardTitle>
+                <CardDescription>
+                  This image will be overlayed at the bottom of your generated videos
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col md:flex-row items-center gap-6">
+                  <div className="w-full md:w-1/2 aspect-[4/1] bg-muted rounded-md overflow-hidden border relative flex items-center justify-center">
+                    <img 
+                      src={bannerUrl} 
+                      alt="Current Banner" 
+                      className="max-w-full max-h-full object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "https://placehold.co/720x180?text=Upload+Your+Banner";
+                      }}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Recommended size: 720x180px (PNG with transparency supported).
+                    </p>
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      ref={fileInputRef} 
+                      accept="image/*"
+                      onChange={handleUploadBanner}
+                    />
+                    <Button 
+                      onClick={() => fileInputRef.current?.click()} 
+                      disabled={isUploading}
+                      className="w-full md:w-auto"
+                      data-testid="button-upload-banner"
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload New Banner
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Latest News Section */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
                 <div>
-                  <h3 className="font-semibold text-lg" data-testid="text-rss-title">{rssItem.title}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Published: {new Date(rssItem.pubDate).toLocaleDateString()}
-                  </p>
+                  <CardTitle className="flex items-center gap-2">
+                    Latest Mortgage Rate News
+                  </CardTitle>
+                  <CardDescription>
+                    Fetched from mortgagenewsdaily.com/rss/rates
+                  </CardDescription>
                 </div>
-                <p className="text-muted-foreground" data-testid="text-rss-description">
-                  {rssItem.description}
-                </p>
-                {rssItem.link && (
-                  <a 
-                    href={rssItem.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline text-sm"
-                    data-testid="link-rss-source"
-                  >
-                    Read full article
-                  </a>
-                )}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No news available</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Marketing Script Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              AI Marketing Script
-            </CardTitle>
-            <CardDescription>
-              Strategically rephrased for first-time home buyers and refinancers
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {rephraseMutation.isPending || isRephrasing ? (
-              <div className="flex items-center gap-3 py-8 justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <span className="text-muted-foreground">Generating marketing script with AI...</span>
-              </div>
-            ) : marketingScript ? (
-              <div className="space-y-4">
-                <div className="bg-muted/50 p-4 rounded-md">
-                  <p className="whitespace-pre-wrap" data-testid="text-marketing-script">{marketingScript}</p>
-                </div>
-                <div className="flex gap-3">
-                  <Button
-                    onClick={handleGenerateVideo}
-                    disabled={createVideoMutation.isPending}
-                    data-testid="button-generate-video"
-                  >
-                    {createVideoMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Starting...
-                      </>
-                    ) : (
-                      <>
-                        <Video className="h-4 w-4 mr-2" />
-                        Generate Video
-                      </>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={handleRefresh}
+                  disabled={rssLoading}
+                  data-testid="button-refresh"
+                >
+                  <RefreshCw className={`h-4 w-4 ${rssLoading ? "animate-spin" : ""}`} />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {rssLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                  </div>
+                ) : rssItem ? (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-semibold text-lg" data-testid="text-rss-title">{rssItem.title}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Published: {new Date(rssItem.pubDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <p className="text-muted-foreground" data-testid="text-rss-description">
+                      {rssItem.description}
+                    </p>
+                    {rssItem.link && (
+                      <a 
+                        href={rssItem.link} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline text-sm"
+                        data-testid="link-rss-source"
+                      >
+                        Read full article
+                      </a>
                     )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (rssItem) {
-                        rephraseMutation.mutate({
-                          title: rssItem.title,
-                          description: rssItem.description,
-                        });
-                      }
-                    }}
-                    disabled={rephraseMutation.isPending}
-                    data-testid="button-regenerate-script"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Regenerate Script
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted-foreground py-4">Loading marketing script...</p>
-            )}
-          </CardContent>
-        </Card>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">No news available</p>
+                )}
+              </CardContent>
+            </Card>
 
-        {/* Generated Videos Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Video className="h-5 w-5 text-primary" />
-              Generated Videos
-            </CardTitle>
-            <CardDescription>
-              Your AI-powered marketing videos
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {videosLoading ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {[1, 2].map((i) => (
-                  <Skeleton key={i} className="h-48 w-full" />
-                ))}
-              </div>
-            ) : videos && videos.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {videos.map((video) => (
-                  <VideoCard key={video.id} video={video} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Video className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No videos generated yet.</p>
-                <p className="text-sm">Generate your first video using the button above.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            {/* Marketing Script Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  AI Marketing Script
+                </CardTitle>
+                <CardDescription>
+                  Strategically rephrased for first-time home buyers and refinancers
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {rephraseMutation.isPending || isRephrasing ? (
+                  <div className="flex items-center gap-3 py-8 justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <span className="text-muted-foreground">Generating marketing script with AI...</span>
+                  </div>
+                ) : marketingScript ? (
+                  <div className="space-y-4">
+                    <div className="bg-muted/50 p-4 rounded-md">
+                      <p className="whitespace-pre-wrap" data-testid="text-marketing-script">{marketingScript}</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={handleGenerateVideo}
+                        disabled={createVideoMutation.isPending}
+                        data-testid="button-generate-video"
+                      >
+                        {createVideoMutation.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Starting...
+                          </>
+                        ) : (
+                          <>
+                            <Video className="h-4 w-4 mr-2" />
+                            Generate Video
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (rssItem) {
+                            rephraseMutation.mutate({
+                              title: rssItem.title,
+                              description: rssItem.description,
+                            });
+                          }
+                        }}
+                        disabled={rephraseMutation.isPending}
+                        data-testid="button-regenerate-script"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Regenerate Script
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground py-4">Loading marketing script...</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-8">
+            {/* Generated Videos Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Video className="h-5 w-5 text-primary" />
+                  Generated Videos
+                </CardTitle>
+                <CardDescription>
+                  Your AI-powered marketing videos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {videosLoading ? (
+                  <div className="grid gap-4">
+                    {[1, 2].map((i) => (
+                      <Skeleton key={i} className="h-48 w-full" />
+                    ))}
+                  </div>
+                ) : videos && videos.length > 0 ? (
+                  <div className="grid gap-4">
+                    {videos.map((video) => (
+                      <VideoCard key={video.id} video={video} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Video className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No videos generated yet.</p>
+                    <p className="text-sm">Generate your first video using the button above.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
