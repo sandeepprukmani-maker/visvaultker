@@ -42,6 +42,28 @@ function getOpenAIClient(): OpenAI {
 const HEYGEN_API_KEY = process.env.HEYGEN_API_KEY;
 const AVATAR_ID = "15141bd577c043cea1d58609abf55a74";
 
+async function deleteVideoFromHeyGen(videoId: string, apiKey: string): Promise<boolean> {
+  try {
+    const response = await fetch(`https://api.heygen.com/v1/video/${videoId}.delete`, {
+      method: "DELETE",
+      headers: {
+        "x-api-key": apiKey,
+      },
+    });
+    const data = await response.json() as any;
+    if (response.ok) {
+      console.log(`Successfully deleted video ${videoId} from HeyGen`);
+      return true;
+    } else {
+      console.error(`Failed to delete video ${videoId} from HeyGen:`, data);
+      return false;
+    }
+  } catch (error) {
+    console.error(`Error deleting video ${videoId} from HeyGen:`, error);
+    return false;
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -122,12 +144,12 @@ Focus on:
 - Clear, actionable next steps they should consider
 - Creating urgency while remaining professional and trustworthy
 
-Make it compelling, actionable, and professional. Keep it concise (approximately 100-120 words) and suitable for a video script that will be spoken by an AI avatar. The total duration of the spoken script should be approximately 40 seconds.
+IMPORTANT: Keep it SHORT and concise - approximately 60-65 words maximum. The spoken script must be around 25 seconds when read aloud (about 2.5 words per second). Do not exceed this length under any circumstances.
 
 Title: ${input.title}
 Description: ${input.description}
 
-Write the marketing script that can be spoken directly. Do not include any stage directions or formatting - just the spoken words.`;
+Write the marketing script that can be spoken directly. Do not include any stage directions or formatting - just the spoken words. Remember: maximum 65 words for a 25-second video.`;
 
       const completion = await getOpenAIClient().chat.completions.create({
         model: "gpt-4o",
@@ -294,8 +316,16 @@ Write the marketing script that can be spoken directly. Do not include any stage
         return res.status(404).json({ message: "Video not found" });
       }
 
-      // If already completed, return cached data
+      // If already completed or failed, return cached data
       if (video.status === "completed" && video.videoUrl) {
+        return res.json({
+          status: video.status,
+          videoUrl: video.videoUrl,
+          thumbnailUrl: video.thumbnailUrl,
+        });
+      }
+
+      if (video.status === "failed") {
         return res.json({
           status: video.status,
           videoUrl: video.videoUrl,
@@ -359,6 +389,7 @@ Write the marketing script that can be spoken directly. Do not include any stage
             const processedFilename = `processed_${video.id}.mp4`;
             const publicDir = path.join(process.cwd(), "public", "processed_videos");
             const outputPath = path.join(publicDir, processedFilename);
+            const tempInputPath = path.join(publicDir, `temp_input_${video.id}.mp4`);
             
             // Check for uploaded banner first, then fall back to original asset
             let overlayPath = path.join(process.cwd(), "public", "banners", "current_banner.png");
@@ -376,54 +407,59 @@ Write the marketing script that can be spoken directly. Do not include any stage
             console.log(`Overlay: ${overlayPath}`);
             console.log(`Output: ${outputPath}`);
 
+            // Step 1: Download the source video first to avoid streaming corruption
+            console.log(`Downloading source video to ${tempInputPath}...`);
+            const videoResponse = await fetch(rawVideoUrl);
+            if (!videoResponse.ok) {
+              throw new Error(`Failed to download source video: ${videoResponse.status}`);
+            }
+            const videoBuffer = await videoResponse.arrayBuffer();
+            fs.writeFileSync(tempInputPath, Buffer.from(videoBuffer));
+            console.log(`Downloaded source video: ${fs.statSync(tempInputPath).size} bytes`);
+
             if (!fs.existsSync(overlayPath)) {
               console.warn(`Overlay file not found, skipping overlay for video ${video.id}: ${overlayPath}`);
-              // Fallback: just download the video without overlay if overlay missing
-              await new Promise((resolve, reject) => {
-                ffmpeg(rawVideoUrl)
-                  .outputOptions([
-                    "-c:v copy",
-                    "-c:a copy",
-                    "-movflags +faststart"
-                  ])
-                  .on("start", (cmd) => console.log("Spawned fallback FFmpeg:", cmd))
-                  .on("end", resolve)
-                  .on("error", (err, stdout, stderr) => {
-                    console.error("Fallback FFmpeg error:", err);
-                    console.error("Fallback FFmpeg stderr:", stderr);
-                    reject(err);
-                  })
-                  .save(outputPath);
-              });
+              // Fallback: just copy the video without overlay if overlay missing
+              fs.copyFileSync(tempInputPath, outputPath);
             } else {
+              // Step 2: Process the local video file with overlay
               await new Promise((resolve, reject) => {
-                ffmpeg(rawVideoUrl)
+                ffmpeg(tempInputPath)
                   .input(overlayPath)
                   .complexFilter([
-                    "[1:v]scale=720:-1[overlay]",
-                    "[0:v][overlay]overlay=0:H-h[out]"
+                    "[0:v]format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2[video]",
+                    "[1:v]format=rgba,scale=720:-1[overlay]",
+                    "[video][overlay]overlay=0:H-h:format=auto[out]"
                   ])
                   .outputOptions([
                     "-map [out]",
-                    "-map 0:a:0?", // Copy audio if it exists
+                    "-map 0:a?",
                     "-c:v libx264",
-                    "-preset ultrafast",
+                    "-preset medium",
                     "-crf 23",
+                    "-profile:v baseline",
+                    "-level 3.0",
                     "-pix_fmt yuv420p",
-                    "-movflags +faststart",
                     "-c:a aac",
-                    "-shortest"
+                    "-b:a 128k",
+                    "-ar 44100",
+                    "-shortest",
+                    "-f mp4"
                   ])
                   .on("start", (commandLine) => {
                     console.log("Spawned FFmpeg with command: " + commandLine);
                   })
                   .on("end", () => {
                     console.log(`FFmpeg processing finished for video ${video.id}`);
+                    // Clean up temp file
+                    try { fs.unlinkSync(tempInputPath); } catch (e) {}
                     resolve(true);
                   })
                   .on("error", (err, stdout, stderr) => {
                     console.error(`FFmpeg error for video ${video.id}:`, err);
                     console.error("FFmpeg stderr:", stderr);
+                    // Clean up temp file
+                    try { fs.unlinkSync(tempInputPath); } catch (e) {}
                     reject(err);
                   })
                   .save(outputPath);
@@ -454,8 +490,25 @@ Write the marketing script that can be spoken directly. Do not include any stage
         } else if (status === "failed") {
           console.error(`HeyGen video status for video ${id} is failed. Response data:`, heygenData);
           await storage.updateVideo(id, { status: "failed" });
-        } else if (status === "processing") {
-          await storage.updateVideo(id, { status: "processing" });
+        } else if (status === "processing" || status === "pending") {
+          // Auto-terminate if HeyGen has been processing/pending for more than 20 minutes
+          const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
+          const createdAt = new Date(video.createdAt).getTime();
+          const now = Date.now();
+          if ((now - createdAt) > TIMEOUT_MS) {
+            console.log(`Video ${id} has been stuck at HeyGen (${status}) for over 20 minutes, auto-terminating and deleting from HeyGen`);
+            
+            // Try to delete from HeyGen to free up concurrency slot
+            const deleteApiKey = successKey?.key || HEYGEN_API_KEY;
+            if (video.videoId && deleteApiKey) {
+              await deleteVideoFromHeyGen(video.videoId, deleteApiKey);
+            }
+            
+            await storage.updateVideo(id, { status: "failed" });
+            status = "failed";
+          } else {
+            await storage.updateVideo(id, { status: status as "pending" | "processing" });
+          }
         }
       }
 
@@ -470,96 +523,143 @@ Write the marketing script that can be spoken directly. Do not include any stage
     }
   });
 
-  // Process existing videos
-  app.post("/api/videos/reprocess-all", async (req, res) => {
+  // Reprocess a single video with current banner
+  app.post("/api/videos/:id/reprocess", async (req, res) => {
     try {
-      const videos = await storage.getVideos();
-      const completedVideos = videos.filter(v => v.status === "completed" && v.videoUrl);
+      const id = parseInt(req.params.id);
+      const video = await storage.getVideo(id);
       
-      const results = [];
-      for (const video of completedVideos) {
-          try {
-            const processedFilename = `processed_${video.id}.mp4`;
-            const publicDir = path.join(process.cwd(), "public", "processed_videos");
-            const outputPath = path.join(publicDir, processedFilename);
-            
-            // Check for uploaded banner first, then fall back to original asset
-            let overlayPath = path.join(process.cwd(), "public", "banners", "current_banner.png");
-            if (!fs.existsSync(overlayPath)) {
-              overlayPath = path.join(process.cwd(), "attached_assets", "GET_A_FREE_RATE_REVIEW_1769255824005.png");
-            }
-
-            // Ensure directory exists
-            if (!fs.existsSync(publicDir)) {
-              fs.mkdirSync(publicDir, { recursive: true });
-            }
-
-            // Ensure correct input URL for reprocessing
-            const rawVideoUrl = video.videoId ? await (async () => {
-              const statusResponse = await fetch(
-                `https://api.heygen.com/v1/video_status.get?video_id=${video.videoId}`,
-                {
-                  method: "GET",
-                  headers: {
-                    "accept": "application/json",
-                    "x-api-key": HEYGEN_API_KEY || "",
-                  },
-                }
-              );
-              const statusData = await statusResponse.json() as any;
-              return statusData.data?.video_url;
-            })() : null;
-
-            if (!rawVideoUrl) {
-              results.push({ id: video.id, status: "failed", error: "Could not retrieve original video URL" });
-              continue;
-            }
-
-            await new Promise((resolve, reject) => {
-              ffmpeg(rawVideoUrl)
-                .input(overlayPath)
-                .complexFilter([
-                  "[1:v]scale=720:-1[overlay]",
-                  "[0:v][overlay]overlay=0:H-h[out]"
-                ])
-                .outputOptions([
-                  "-map [out]",
-                  "-map 0:a:0?", // Copy audio if it exists
-                  "-c:v libx264",
-                  "-preset ultrafast",
-                  "-crf 23",
-                  "-pix_fmt yuv420p",
-                  "-movflags +faststart",
-                  "-c:a aac",
-                  "-shortest"
-                ])
-                .on("start", (commandLine) => {
-                  console.log("Spawned Ffmpeg with command: " + commandLine);
-                })
-                .on("end", () => {
-                  console.log(`FFmpeg processing finished for video ${video.id}`);
-                  resolve(true);
-                })
-                .on("error", (err) => {
-                  console.error(`FFmpeg error for video ${video.id}:`, err);
-                  reject(err);
-                })
-                .save(outputPath);
-            });
-
-            const newUrl = `/processed_videos/${processedFilename}`;
-            await storage.updateVideo(video.id, { videoUrl: newUrl });
-            results.push({ id: video.id, status: "success" });
-          } catch (err) {
-          console.error(`Failed to process video ${video.id}:`, err);
-          results.push({ id: video.id, status: "failed", error: String(err) });
-        }
+      if (!video) {
+        return res.status(404).json({ message: "Video not found" });
       }
       
-      res.json({ message: "Reprocessing completed", results });
+      if (!video.videoId) {
+        return res.status(400).json({ message: "No HeyGen video ID found for this video" });
+      }
+
+      // Get active API key from database
+      const keys = await storage.getApiKeys("heygen");
+      const activeKey = keys.find(k => k.isActive === "true");
+      if (!activeKey) {
+        return res.status(400).json({ message: "No active HeyGen API key found" });
+      }
+
+      // Get the original video URL from HeyGen
+      const statusResponse = await fetch(
+        `https://api.heygen.com/v1/video_status.get?video_id=${video.videoId}`,
+        {
+          method: "GET",
+          headers: {
+            "accept": "application/json",
+            "x-api-key": activeKey.key,
+          },
+        }
+      );
+      const statusData = await statusResponse.json() as any;
+      const rawVideoUrl = statusData.data?.video_url;
+
+      if (!rawVideoUrl) {
+        return res.status(400).json({ message: "Could not retrieve original video URL from HeyGen" });
+      }
+
+      // Check for uploaded banner first, then fall back to original asset
+      let overlayPath = path.join(process.cwd(), "public", "banners", "current_banner.png");
+      if (!fs.existsSync(overlayPath)) {
+        overlayPath = path.join(process.cwd(), "attached_assets", "GET_A_FREE_RATE_REVIEW_1769255824005.png");
+      }
+
+      const processedFilename = `processed_${video.id}.mp4`;
+      const publicDir = path.join(process.cwd(), "public", "processed_videos");
+      const outputPath = path.join(publicDir, processedFilename);
+
+      // Ensure directory exists
+      if (!fs.existsSync(publicDir)) {
+        fs.mkdirSync(publicDir, { recursive: true });
+      }
+
+      // Download HeyGen video to temp file first to avoid streaming issues
+      const tempInputPath = path.join(publicDir, `temp_input_${video.id}.mp4`);
+      const videoResponse = await fetch(rawVideoUrl);
+      const videoBuffer = await videoResponse.arrayBuffer();
+      fs.writeFileSync(tempInputPath, Buffer.from(videoBuffer));
+
+      await new Promise((resolve, reject) => {
+        ffmpeg(tempInputPath)
+          .input(overlayPath)
+          .complexFilter([
+            "[0:v]format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2[video]",
+            "[1:v]format=rgba,scale=720:-1[overlay]",
+            "[video][overlay]overlay=0:H-h:format=auto[out]"
+          ])
+          .outputOptions([
+            "-map [out]",
+            "-map 0:a?",
+            "-c:v libx264",
+            "-preset medium",
+            "-crf 23",
+            "-profile:v baseline",
+            "-level 3.0",
+            "-pix_fmt yuv420p",
+            "-c:a aac",
+            "-b:a 128k",
+            "-ar 44100",
+            "-shortest",
+            "-f mp4"
+          ])
+          .on("start", (commandLine) => {
+            console.log("Reprocess FFmpeg command: " + commandLine);
+          })
+          .on("end", () => {
+            console.log(`Reprocessing finished for video ${video.id}`);
+            try { fs.unlinkSync(tempInputPath); } catch (e) {}
+            resolve(true);
+          })
+          .on("error", (err) => {
+            console.error(`Reprocess FFmpeg error for video ${video.id}:`, err);
+            try { fs.unlinkSync(tempInputPath); } catch (e) {}
+            reject(err);
+          })
+          .save(outputPath);
+      });
+
+      const newUrl = `/processed_videos/${processedFilename}`;
+      await storage.updateVideo(video.id, { videoUrl: newUrl });
+
+      res.json({ message: "Video reprocessed successfully", videoUrl: newUrl });
     } catch (error) {
-      console.error("Error in reprocess-all:", error);
-      res.status(500).json({ message: "Failed to reprocess videos" });
+      console.error("Error reprocessing video:", error);
+      res.status(500).json({ message: "Failed to reprocess video" });
+    }
+  });
+
+  // Delete a video (both from database and HeyGen)
+  app.delete("/api/videos/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const video = await storage.getVideo(id);
+      
+      if (!video) {
+        return res.status(404).json({ message: "Video not found" });
+      }
+
+      // Try to delete from HeyGen first
+      if (video.videoId) {
+        const keys = await storage.getApiKeys("heygen");
+        const activeKey = keys.find(k => k.isActive === "true");
+        const apiKey = activeKey?.key || HEYGEN_API_KEY;
+        
+        if (apiKey) {
+          await deleteVideoFromHeyGen(video.videoId, apiKey);
+        }
+      }
+
+      // Delete from local storage and database
+      await storage.deleteVideo(id);
+      
+      res.json({ message: "Video deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting video:", error);
+      res.status(500).json({ message: "Failed to delete video" });
     }
   });
 

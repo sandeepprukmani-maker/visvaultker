@@ -10,6 +10,7 @@ export interface IStorage {
   getVideoByVideoId(videoId: string): Promise<Video | undefined>;
   createVideo(video: InsertVideo): Promise<Video>;
   updateVideo(id: number, updates: Partial<InsertVideo>): Promise<Video>;
+  deleteVideo(id: number): Promise<void>;
   
   // API Key management
   getApiKeys(service: string): Promise<ApiKey[]>;
@@ -67,6 +68,23 @@ export class DatabaseStorage implements IStorage {
       .where(eq(videos.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteVideo(id: number): Promise<void> {
+    const video = await this.getVideo(id);
+    if (video) {
+      if (video.videoUrl && video.videoUrl.startsWith("/processed_videos/")) {
+        const filePath = path.join(process.cwd(), "public", video.videoUrl);
+        if (fs.existsSync(filePath)) {
+          try {
+            fs.unlinkSync(filePath);
+          } catch (err) {
+            console.error(`Failed to delete video file ${filePath}:`, err);
+          }
+        }
+      }
+      await db.delete(videos).where(eq(videos.id, id));
+    }
   }
 
   async getApiKeys(service: string): Promise<ApiKey[]> {

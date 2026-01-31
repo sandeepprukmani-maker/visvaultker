@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Video, Download, RefreshCw, Sparkles, TrendingUp, Upload, Image as ImageIcon } from "lucide-react";
+import { Loader2, Video, Download, RefreshCw, Sparkles, TrendingUp, Upload, Image as ImageIcon, Trash2 } from "lucide-react";
 import type { RSSItem, VideoResponse } from "@shared/routes";
 import { KeyManagement } from "@/components/key-management";
 
@@ -379,7 +379,55 @@ function VideoCard({ video }: { video: VideoResponse }) {
   const [status, setStatus] = useState(video.status);
   const [videoUrl, setVideoUrl] = useState(video.videoUrl);
   const [thumbnailUrl, setThumbnailUrl] = useState(video.thumbnailUrl);
+  const [isReprocessing, setIsReprocessing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
+
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this video? This will also remove it from HeyGen.")) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await apiRequest("DELETE", `/api/videos/${video.id}`);
+      toast({
+        title: "Video deleted",
+        description: "The video has been removed.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
+    } catch (error) {
+      toast({
+        title: "Delete failed",
+        description: "Could not delete the video. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleReprocess = async () => {
+    setIsReprocessing(true);
+    try {
+      const response = await apiRequest("POST", `/api/videos/${video.id}/reprocess`);
+      const data = await response.json();
+      if (data.videoUrl) {
+        setVideoUrl(data.videoUrl + "?t=" + Date.now()); // Cache bust
+        toast({
+          title: "Video reprocessed",
+          description: "The video has been updated with the latest banner.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Reprocess failed",
+        description: "Could not reprocess the video. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsReprocessing(false);
+    }
+  };
 
   // Poll for status if pending or processing
   useEffect(() => {
@@ -476,19 +524,53 @@ function VideoCard({ video }: { video: VideoResponse }) {
           {new Date(video.createdAt).toLocaleString()}
         </p>
         
-        {status === "completed" && videoUrl && (
-          <a
-            href={videoUrl}
-            download
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-            data-testid={`link-download-${video.id}`}
+        <div className="flex items-center gap-3 flex-wrap">
+          {status === "completed" && videoUrl && (
+            <>
+              <a
+                href={videoUrl}
+                download
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                data-testid={`link-download-${video.id}`}
+              >
+                <Download className="h-4 w-4" />
+                Download Video
+              </a>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReprocess}
+                disabled={isReprocessing}
+                className="text-sm"
+                data-testid={`button-reprocess-${video.id}`}
+              >
+                {isReprocessing ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                )}
+                {isReprocessing ? "Reprocessing..." : "Reprocess"}
+              </Button>
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="text-sm text-destructive hover:text-destructive"
+            data-testid={`button-delete-${video.id}`}
           >
-            <Download className="h-4 w-4" />
-            Download Video
-          </a>
-        )}
+            {isDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-1" />
+            )}
+            {isDeleting ? "Deleting..." : "Delete"}
+          </Button>
+        </div>
       </div>
     </div>
   );

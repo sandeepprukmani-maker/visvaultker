@@ -1,81 +1,70 @@
 # Mortgage News Video Generator
 
 ## Overview
-
-This application is a mortgage news video generator that fetches RSS feed content from mortgage news sources, uses AI to rephrase the content into marketing scripts, and generates videos using the HeyGen API. It's built as a full-stack TypeScript application with a React frontend and Express backend.
+The Mortgage News Video Generator is an application designed to automate the creation of professional AI-generated videos featuring mortgage news. It fetches content from RSS feeds, rephrases it into concise marketing scripts using AI, and then produces videos with custom promotional banner overlays via the HeyGen API. The primary purpose is to deliver engaging video content for first-time home buyers and refinancers, enhancing market reach and content production efficiency.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
-- **Framework**: React 18 with TypeScript
-- **Routing**: Wouter for lightweight client-side routing
-- **State Management**: TanStack React Query for server state management and caching
-- **UI Components**: shadcn/ui component library built on Radix UI primitives
-- **Styling**: Tailwind CSS with custom CSS variables for theming (light/dark mode support)
-- **Build Tool**: Vite for development and production builds
+### Core Functionality
+The application automates video content creation through several stages: content fetching from RSS feeds, AI-driven script generation (25-second, 60-65 words) tailored for first-time home buyers and refinancers, HeyGen API integration for video generation with avatar settings, and FFmpeg post-processing for adding customizable promotional banner overlays. Videos can be reprocessed with updated banners.
 
-### Backend Architecture
+### Frontend
+- **Framework**: React 18 with TypeScript
+- **Routing**: Wouter
+- **State Management**: TanStack React Query
+- **UI Components**: shadcn/ui (built on Radix UI)
+- **Styling**: Tailwind CSS with custom CSS variables (light/dark mode)
+- **Build Tool**: Vite
+
+### Backend
 - **Framework**: Express.js with TypeScript
-- **API Design**: RESTful endpoints defined in `shared/routes.ts` with Zod schema validation
-- **Database ORM**: Drizzle ORM with PostgreSQL dialect
-- **AI Integration**: OpenAI API (via Replit AI Integrations) for content rephrasing
-- **External APIs**: 
-  - HeyGen API for video generation
-  - Mortgage News Daily RSS feed for content sourcing
+- **API Design**: RESTful with Zod schema validation
+- **Database ORM**: Drizzle ORM with PostgreSQL
+- **Video Processing**: fluent-ffmpeg for banner overlays
+- **AI Integration**: OpenAI API for content rephrasing
+- **External APIs**: HeyGen API, Mortgage News Daily RSS
 
 ### Data Storage
-- **Database**: PostgreSQL with Drizzle ORM
-- **Schema Location**: `shared/schema.ts` defines all database tables
-- **Tables**:
-  - `users`: Basic user authentication (username/password)
-  - `videos`: Stores generated video metadata (videoId, status, URLs, scripts)
-  - `conversations` and `messages`: Chat functionality for AI integrations
+- **Database**: PostgreSQL
+- **ORM**: Drizzle ORM
+- **Key Tables**: `users`, `videos` (metadata), `api_keys` (HeyGen key management), `conversations`, `messages`.
 
 ### Project Structure
-```
-├── client/           # React frontend
-│   └── src/
-│       ├── components/ui/  # shadcn/ui components
-│       ├── pages/          # Page components
-│       ├── hooks/          # Custom React hooks
-│       └── lib/            # Utilities and query client
-├── server/           # Express backend
-│   ├── routes.ts     # API route handlers
-│   ├── storage.ts    # Database operations
-│   └── db.ts         # Database connection
-├── shared/           # Shared types and schemas
-│   ├── schema.ts     # Drizzle database schema
-│   └── routes.ts     # API contract definitions
-└── migrations/       # Database migrations
-```
+- `client/`: React frontend.
+- `server/`: Express backend, including API routes, database operations, and connection.
+- `shared/`: Shared types, Drizzle schema, and API route definitions.
+- `public/`: Stores uploaded banner images and processed videos.
+- `attached_assets/`: Default assets.
+- `migrations/`: Database migrations.
 
-### Build System
-- Development: `npm run dev` runs tsx to start the Express server with Vite middleware
-- Production: `npm run build` bundles both client (Vite) and server (esbuild)
-- Database: `npm run db:push` pushes schema changes to PostgreSQL
+### Technical Implementations
+- **FFmpeg Handling**: Videos are downloaded locally before FFmpeg processing to prevent streaming corruption. `movflags +faststart` is avoided, and H.264 baseline profile with level 3.0 is used for maximum compatibility.
+- **API Key Management**: HeyGen API keys are managed via the UI and stored in the database, not as environment variables.
+- **Error Handling**: Includes mechanisms to auto-delete stuck HeyGen videos after 20 minutes (only if HeyGen is still processing, not during FFmpeg reprocessing).
 
 ## External Dependencies
 
-### Required Environment Variables
-- `DATABASE_URL`: PostgreSQL connection string (required for database operations)
-- `AI_INTEGRATIONS_OPENAI_API_KEY`: OpenAI API key for content rephrasing
-- `AI_INTEGRATIONS_OPENAI_BASE_URL`: OpenAI base URL (for Replit AI Integrations)
-- `HEYGEN_API_KEY`: HeyGen API key for video generation
+### Environment Variables
+- `DATABASE_URL`: PostgreSQL connection string.
+- `OPENAI_API_KEY`: OpenAI API key.
+- `AI_INTEGRATIONS_OPENAI_API_KEY`: (Optional) OpenAI API key for Replit AI Integrations.
+- `AI_INTEGRATIONS_OPENAI_BASE_URL`: (Optional) OpenAI base URL for Replit AI Integrations.
 
 ### Third-Party Services
-- **PostgreSQL**: Primary database (provision via Replit Database or external provider)
-- **OpenAI API**: Used for rephrasing RSS content into marketing scripts
-- **HeyGen API**: Avatar-based video generation service
-- **Mortgage News Daily RSS**: External RSS feed source for mortgage news content
+- **PostgreSQL**: Primary database.
+- **OpenAI API**: For rephrasing news content into marketing scripts.
+- **HeyGen API**: For avatar-based video generation.
+- **Mortgage News Daily RSS**: Source for mortgage news content.
 
-### Key NPM Dependencies
-- `drizzle-orm` / `drizzle-kit`: Database ORM and migrations
-- `@tanstack/react-query`: Server state management
-- `openai`: OpenAI API client
-- `xml2js`: RSS feed XML parsing
-- `zod`: Runtime type validation
-- `express`: Web server framework
+### Key NPM Packages
+- `drizzle-orm`, `drizzle-kit`
+- `@tanstack/react-query`
+- `openai`
+- `fluent-ffmpeg`
+- `xml2js`
+- `zod`
+- `express`
+- `multer`
