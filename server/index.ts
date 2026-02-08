@@ -6,6 +6,7 @@ import { exec } from "child_process";
 import fs from "fs";
 
 const app = express();
+app.use(express.json({ limit: "2mb" }));
 const httpServer = createServer(app);
 
 declare module "http" {
@@ -70,6 +71,11 @@ app.use((req, res, next) => {
       fs.mkdirSync(".ssh", { recursive: true });
       fs.writeFileSync(".ssh/valargen-staging_key.pem", process.env.SSH_KEY_PEM);
       fs.chmodSync(".ssh/valargen-staging_key.pem", 0o600);
+    } else {
+      // Ensure existing key has correct permissions if it exists
+      if (fs.existsSync(".ssh/valargen-staging_key.pem")) {
+        fs.chmodSync(".ssh/valargen-staging_key.pem", 0o600);
+      }
     }
 
     const sshKeyPath = process.env.SSH_KEY_PATH || ".ssh/valargen-staging_key.pem";
@@ -84,6 +90,9 @@ app.use((req, res, next) => {
         log(`SSH tunnel error: ${error.message}`, "error");
       }
     });
+
+    tunnel.stderr?.on("data", d => console.error("[ssh]", d.toString()));
+    tunnel.on("exit", code => console.error("[ssh exit]", code));
     
     process.on("exit", () => tunnel.kill());
   }

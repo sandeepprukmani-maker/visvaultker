@@ -1,0 +1,64 @@
+Thought for 2m 55sI dug into your project ZIP and the 500 you’re seeing is coming from your proxy code, not necessarily UWM.
+The actual issue (with proof from your code)
+1) Your SSH tunnel is often not up, but the server keeps running anyway
+In server/index.ts, you start SSH with exec(...), but even if it fails you only log the error and still start serving the API.
+So when the tunnel isn’t up, requests go effectively “direct” to UWM → Cloudflare blocks → HTML error page.
+2) Your /pricequote proxy assumes UWM always returns JSON
+In server/routes.ts (mortgage quote route):
+const uwmRes = await uwmFetch("/instantpricequote/v1/pricequote", ...)
+const mockResponse = await uwmRes.json();   // <-- this is the killer
+
+When Cloudflare returns HTML (like your “OOPS!” page or 403 forbidden HTML), uwmRes.json() throws. That lands in your catch block and you return:
+res.status(500).json({ message: "Internal Server Error" });
+
+✅ That matches exactly what Swagger shows: 500 { "message": "Internal Server Error" }
+So the “500” is basically: “I tried to JSON-parse an HTML response and crashed.”
+
+Why you keep seeing Cloudflare HTML
+From your logs earlier, SSH was failing due to key permissions:
+
+
+UNPROTECTED PRIVATE KEY FILE ... key will be ignored
+
+
+then Permission denied (publickey)
+
+
+When that happens, tunnel is dead → calls are not coming from whitelisted Azure IP → Cloudflare blocks → HTML → your .json() crashes → 500.
+
+Fixes you should make (these will eliminate the 500 + show real upstream errors)
+Fix A) Make tunnel startup mandatory (don’t serve if tunnel failed)
+In server/index.ts, if SSH fails, you should process.exit(1) so you don’t run in a broken state.
+Also, bind tunnel to IPv4 explicitly:
+-L 127.0.0.1:9000:stg.api.uwm.com:443
+Fix B) Stop doing await uwmRes.json() blindly
+Change /pricequote (and other proxy routes) to:
+
+
+read text()
+
+
+if JSON, parse it
+
+
+if HTML/text, return it as-is with correct status
+
+
+That way Swagger will show the real upstream status/body (401/403/validation errors) instead of a generic 500.
+Fix C) Your Swagger call must include Authorization header
+Your /api/uwm/instantpricequote/v1/pricequote route requires Authorization header (it returns 401 if missing).
+So you must either:
+
+
+call your token endpoint first and paste the Bearer token into Swagger “Authorize”
+or
+
+
+change the server to fetch the token itself and not require Swagger to supply it.
+
+
+
+Bottom line
+Your current 500 is happening because:
+Tunnel is failing or not used → Cloudflare returns HTML → your route tries .json() → throws → you return 500.
+If you want, upload the latest ZIP you’re running (the one currently deployed on Replit), and I’ll point to the exact line numbers to patch and give you ready-to-paste code blocks for each route (token, mortgagepricinglayout, heloclayout, pricequote, helocquote).

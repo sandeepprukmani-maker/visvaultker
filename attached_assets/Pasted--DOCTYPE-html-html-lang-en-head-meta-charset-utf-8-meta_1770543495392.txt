@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta http-equiv="x-ua-compatible" content="ie=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>Error Message</title>
+    	<style type="text/css">body,html{margin:0;padding:0}body{font-family:sans-serif}h1{color:#006199;font-size:68px;font-weight:700;margin-bottom:0;padding:0 60px}.cf,.cf-error-details{display:none}p{padding:2px 60px}header{background:#006199;color:#fff;padding:20px 60px}footer h1,header h1{color:#fff;display:inline-block;font-size:72px;font-weight:100;margin:0 auto;padding:0;text-align:left}footer{background:#a4cf7a;bottom:0;color:#fff;display:block;height:100px;padding:20px 60px 50px;position:absolute;width:100%}.logo_bottom{border-top:1px solid #fff;display:block;font-size:11px;padding:3px 0;position:relative;text-align:center;text-transform:uppercase;top:-7px;width:180px}.body_container{height:100%}strong{font-weight:700}@media screen and (max-width:632px){header .logo_container{margin:0 auto;width:180px}footer .logo_container{margin:0 auto;width:299px}}@media screen and (max-width:320px){footer,header{padding:20px 60px 20px 50px}footer .logo_container{margin:0 auto;width:285px}}</style>
+    </head>
+    <header>	
+    <div class="logo_container">
+    		<h1>UWM</h1>
+    		<span class="logo_bottom">United Wholesale Mortgage</span>
+    	</div>
+    </header>
+	<body>
+    <div id="body" class="body_container">
+    	 <h1>OOPS!</h1>
+    	 <p>The page you are attempting to access has received an error.</p>
+    	 <p>Please try your request again, or contact your AE if the issue persists.</p>
+		 <p>Please consult with your administrator</p>
+    	 <p><strong>Your Cloudflare Ray ID is: </strong> 9caa2634af696835 </p>
+		 <p class="cf">::CLOUDFLARE_ERROR_1000S_BOX::</p>
+    </div>
+	<footer>
+    	<div class="logo_container">
+    			<h1>UWM</h1>
+    			<span class="logo_bottom">United Wholesale Mortgage</span>
+    	</div>
+    </footer>
+	</body>
+    </html>

@@ -10,3 +10,5 @@
 [x] 10. Install required packages and dependencies for Replit migration
 [x] 11. Provision and push database schema
 [x] 12. Restart workflow and verify application runs
+[x] 13. Improved proxy error handling and SSH logging for debugging
+[x] 14. Fixed Cloudflare Error 1000 by ensuring proper Host header and SNI synchronization in the proxy dispatcher.

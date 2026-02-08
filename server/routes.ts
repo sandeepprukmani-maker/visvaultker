@@ -34,8 +34,14 @@ export async function registerRoutes(
 
   function uwmFetch(path: string, init: any = {}) {
     const url = path.startsWith("http") ? path : `${UWM_BASE_URL}${path}`;
+    const headers = {
+      ...init.headers,
+      "Host": "stg.api.uwm.com", // Ensure Host header matches SNI
+    };
+
     return fetch(url, {
       ...init,
+      headers,
       ...(USE_UWM_TUNNEL ? { dispatcher: uwmTunnelDispatcher } : {}),
     });
   }
@@ -126,20 +132,24 @@ export async function registerRoutes(
         body: params.toString(),
       });
 
-      const text = await uwmRes.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        console.error("Non-JSON response from UWM auth:", text);
-        return res.status(502).json({ error: "bad_gateway", error_description: "UWM returned non-JSON response" });
-      }
+    const text = await uwmRes.text();
+    if (!uwmRes.ok) {
+      console.error("UWM auth error", {
+        status: uwmRes.status,
+        body: text.slice(0, 2000),
+      });
+      return res.status(uwmRes.status).type("text/plain").send(text);
+    }
 
-      if (!uwmRes.ok) {
-        return res.status(uwmRes.status).json(data);
-      }
-      
-      res.json(data);
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error("Non-JSON response from UWM auth:", text);
+      return res.status(502).json({ error: "bad_gateway", error_description: "UWM returned non-JSON response" });
+    }
+    
+    res.json(data);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ error: "invalid_request", error_description: err.errors[0].message });
@@ -187,11 +197,20 @@ export async function registerRoutes(
         body: JSON.stringify(req.body),
       });
 
-      const data = await uwmRes.json();
+      const raw = await uwmRes.text();
       if (!uwmRes.ok) {
-        return res.status(uwmRes.status).json(data);
+        console.error("UWM mortgage layout error", {
+          status: uwmRes.status,
+          body: raw.slice(0, 2000),
+        });
+        return res.status(uwmRes.status).type("text/plain").send(raw);
       }
-      res.json(data);
+
+      try {
+        res.json(JSON.parse(raw));
+      } catch {
+        res.type("text/plain").send(raw);
+      }
     } catch (err) {
       console.error("Mortgage layout proxy error:", err);
       res.status(500).json({ message: "Internal Server Error" });
@@ -235,11 +254,20 @@ export async function registerRoutes(
          body: JSON.stringify(req.body),
        });
 
-       const data = await uwmRes.json();
+       const raw = await uwmRes.text();
        if (!uwmRes.ok) {
-         return res.status(uwmRes.status).json(data);
+         console.error("UWM HELOC layout error", {
+           status: uwmRes.status,
+           body: raw.slice(0, 2000),
+         });
+         return res.status(uwmRes.status).type("text/plain").send(raw);
        }
-       res.json(data);
+
+       try {
+         res.json(JSON.parse(raw));
+       } catch {
+         res.type("text/plain").send(raw);
+       }
      } catch (err) {
        console.error("HELOC layout proxy error:", err);
        res.status(500).json({ message: "Internal Server Error" });
@@ -323,6 +351,7 @@ export async function registerRoutes(
     }
 
     try {
+      console.log("Incoming pricequote body keys:", Object.keys(req.body || {}));
       const input = api.quotes.mortgage.input.parse(req.body);
 
       // Proxy to UWM via tunnel
@@ -335,11 +364,16 @@ export async function registerRoutes(
         body: JSON.stringify(req.body),
       });
 
-      const mockResponse = await uwmRes.json();
+      const raw = await uwmRes.text();
       if (!uwmRes.ok) {
-        return res.status(uwmRes.status).json(mockResponse);
+        console.error("UWM pricequote error", {
+          status: uwmRes.status,
+          body: raw.slice(0, 2000),
+        });
+        return res.status(uwmRes.status).type("text/plain").send(raw);
       }
 
+      const mockResponse = JSON.parse(raw);
       // Persist this scenario
       await storage.createScenario({
         loanAmount: input.loanAmount,
@@ -509,6 +543,20 @@ export async function registerRoutes(
      }
     await storage.deleteScenario(Number(req.params.id));
     res.status(204).end();
+  });
+
+  // Debug endpoint for SSH tunnel/connectivity
+  app.get("/api/uwm/_debug/tunnel", async (_req, res) => {
+    try {
+      const uwmRes = await uwmFetch("/health", { method: "GET" });
+      res.json({ 
+        status: uwmRes.status, 
+        ok: uwmRes.ok, 
+        usingTunnel: USE_UWM_TUNNEL 
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message, usingTunnel: USE_UWM_TUNNEL });
+    }
   });
 
   return httpServer;
