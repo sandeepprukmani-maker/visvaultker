@@ -1,0 +1,180 @@
+Perfect 👍 Having the .pem file actually makes this cleaner.
+Below is the EASIEST, COPY-PASTE, STEP-BY-STEP guide specifically for PEM key auth.
+
+No assumptions. No skipped steps.
+
+⸻
+
+Goal (with PEM key)
+
+Use your local laptop → SSH tunnel → Azure VM (whitelisted IP) → UWM APIs
+
+⸻
+
+What you already have ✅
+	•	Azure VM Public IP
+	•	.pem file (SSH private key)
+	•	VM username (example: azureuser)
+	•	VM can access UWM (already whitelisted)
+
+⸻
+
+STEP 1: Place PEM file correctly
+
+Move your .pem file to a safe folder.
+
+Mac / Linux:
+
+mkdir -p ~/.ssh
+mv mykey.pem ~/.ssh/
+
+Windows:
+	•	Put it inside:
+
+C:\Users\<your-username>\.ssh\
+
+
+⸻
+
+STEP 2: Set correct permission (VERY IMPORTANT)
+
+Mac / Linux:
+
+chmod 400 ~/.ssh/mykey.pem
+
+❌ If you skip this → SSH will fail
+
+Windows (Git Bash):
+
+chmod 400 ~/.ssh/mykey.pem
+
+
+⸻
+
+STEP 3: Test SSH login using PEM
+
+Run this from your laptop:
+
+ssh -i ~/.ssh/mykey.pem azureuser@<VM_PUBLIC_IP>
+
+Example:
+
+ssh -i ~/.ssh/mykey.pem azureuser@20.204.xx.xx
+
+✔ If you log in → type exit and continue
+❌ If not → stop here (don’t tunnel yet)
+
+⸻
+
+STEP 4: Create SSH Tunnel using PEM (MAIN STEP)
+
+Now create the tunnel 👇
+
+ssh -i ~/.ssh/mykey.pem \
+-L 9000:uwm.internal.api:443 \
+azureuser@<VM_PUBLIC_IP>
+
+⚠️ Do NOT close this terminal
+
+⸻
+
+STEP 5: Verify tunnel is working
+
+Open browser or Postman and hit:
+
+https://localhost:9000
+
+If it’s HTTPS and internal:
+	•	You may see cert warning → ignore for local
+	•	Or you’ll get API response
+
+✔ Tunnel works
+
+⸻
+
+STEP 6: Call from your LOCAL application
+
+Python example:
+
+import requests
+
+url = "https://localhost:9000/api/v1/loan"
+
+res = requests.get(url, verify=False)
+print(res.status_code)
+print(res.text)
+
+
+⸻
+
+STEP 7: Run flow (correct order)
+
+Terminal 1 (Tunnel – KEEP OPEN):
+
+ssh -i ~/.ssh/mykey.pem -L 9000:uwm.internal.api:443 azureuser@<VM_PUBLIC_IP>
+
+Terminal 2 (App):
+
+python app.py
+
+
+⸻
+
+OPTIONAL (Cleaner Command – Save Time)
+
+Create SSH config so you don’t type long commands.
+
+Edit:
+
+nano ~/.ssh/config
+
+Add:
+
+Host azure-uwm
+    HostName <VM_PUBLIC_IP>
+    User azureuser
+    IdentityFile ~/.ssh/mykey.pem
+
+Now tunnel with:
+
+ssh azure-uwm -L 9000:uwm.internal.api:443
+
+🔥 Much cleaner
+
+⸻
+
+COMMON ERRORS & FIXES
+
+❌ “Permissions too open”
+
+✔ Fix:
+
+chmod 400 ~/.ssh/mykey.pem
+
+
+⸻
+
+❌ “Connection timed out”
+
+✔ Check:
+	•	VM Public IP correct?
+	•	Port 22 allowed in NSG?
+
+⸻
+
+❌ “Connection refused”
+
+✔ Means:
+	•	UWM API host/port wrong
+	•	Try testing inside VM first:
+
+curl https://uwm.internal.api
+
+
+⸻
+
+ONE-LINE SUMMARY
+
+PEM file + SSH tunnel = your laptop behaves like Azure IP
+
+⸻

@@ -1,0 +1,107 @@
+Yep — **this 403 is actually a really good clue**.
+
+### What changed?
+
+Now you’re getting:
+
+```html
+403 Forbidden
+cloudflare
+```
+
+That usually happens when Cloudflare receives a request where the **Host header / routing doesn’t match what it expects**.
+
+And with Option B, that’s exactly what’s happening:
+
+* When you call `https://127.0.0.1:9000/...`, the HTTP request’s host is effectively **127.0.0.1**
+* Cloudflare expects **Host: stg.api.uwm.com**
+* Result: **403 Forbidden (cloudflare)**
+
+### Why you can’t “just set Host”
+
+In Node’s `fetch` (undici), `Host` is a **forbidden header** (spec thing), so you can’t reliably override it.
+
+---
+
+# ✅ Correct Fix: Keep the URL as `https://stg.api.uwm.com/...` (so Host is right) but force the TCP connection through the tunnel
+
+We’ll do this by making undici connect to `127.0.0.1:9000` while the request URL stays `stg.api.uwm.com`.
+
+## Update `uwmFetch()` helper in `server/routes.ts`
+
+Replace your tunnel logic with this pattern:
+
+```ts
+import { Agent as UndiciAgent } from "undici";
+
+// Always keep the URL host as the real domain (so Host header is correct)
+const UWM_BASE_URL = "https://stg.api.uwm.com";
+const USE_UWM_TUNNEL = process.env.USE_UWM_TUNNEL === "true";
+const TUNNEL_HOST = process.env.UWM_TUNNEL_HOST || "127.0.0.1";
+const TUNNEL_PORT = Number(process.env.UWM_TUNNEL_LOCAL_PORT || "9000");
+
+// When tunnel is enabled, connect to local forward, but keep TLS SNI as stg.api.uwm.com
+const uwmTunnelDispatcher = new UndiciAgent({
+  connect: {
+    hostname: TUNNEL_HOST,   // <-- connects to local SSH forward
+    port: TUNNEL_PORT,       // <-- 9000
+    servername: "stg.api.uwm.com", // <-- SNI/TLS for Cloudflare
+  },
+});
+
+function uwmFetch(path: string, init: any = {}) {
+  const url = path.startsWith("http") ? path : `${UWM_BASE_URL}${path}`;
+  return fetch(url, {
+    ...init,
+    ...(USE_UWM_TUNNEL ? { dispatcher: uwmTunnelDispatcher } : {}),
+  });
+}
+```
+
+✅ Now:
+
+* URL stays `https://stg.api.uwm.com/adfs/oauth2/token` → correct `Host`
+* Connection goes to `127.0.0.1:9000` → through SSH tunnel → Azure VM → UWM
+* TLS SNI stays `stg.api.uwm.com` → Cloudflare happy
+
+---
+
+# 🔧 SSH tunnel command reminder (must match)
+
+Make sure your SSH forward is:
+
+```bash
+ssh -i <key> \
+  -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -N \
+  -L 127.0.0.1:9000:stg.api.uwm.com:443 \
+  <user>@<azure_vm_ip>
+```
+
+---
+
+# Replit env vars
+
+Set these:
+
+* `USE_UWM_TUNNEL=true`
+* `UWM_TUNNEL_LOCAL_PORT=9000`
+* `UWM_TUNNEL_HOST=127.0.0.1`
+
+---
+
+## After this change, what you should see
+
+Instead of HTML 403, you should get either:
+
+* JSON token response ✅
+  or
+* a **JSON** error from the auth server (wrong creds / wrong grant) ✅
+
+---
+
+If you want, I can apply this patch directly to the ZIP you uploaded (`/mnt/data/visvaultker (11).zip`) and hand you back a ready-to-run fixed ZIP — tell me “patch it” and I’ll do it.
