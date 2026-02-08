@@ -178,12 +178,3 @@ ONE-LINE SUMMARY
 PEM file + SSH tunnel = your laptop behaves like Azure IP
 
 ⸻
-
-If you want next:
-	•	🔐 Auto-start tunnel on reboot
-	•	🌐 Use custom domain instead of localhost
-	•	🐳 Docker + tunnel
-	•	🪟 Windows-only walkthrough
-	•	🚀 Production-ready Azure architecture
-
-Tell me what you want next 👍
