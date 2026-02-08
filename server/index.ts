@@ -105,8 +105,8 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
 
-  // Disable TLS verification for the local SSH tunnel proxy
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+  // Re-enable TLS verification for production API
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "1";
 
   httpServer.listen(
     {

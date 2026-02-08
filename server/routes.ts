@@ -22,6 +22,20 @@ export async function registerRoutes(
         description: "API documentation for UWM Instant Price Quote based on the Onboarding Guide.",
         version: "3.0",
       },
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+          },
+        },
+      },
+      security: [
+        {
+          bearerAuth: [],
+        },
+      ],
     },
     apis: ["./server/routes.ts"],
   };
@@ -35,6 +49,7 @@ export async function registerRoutes(
    *   post:
    *     tags: [Authentication]
    *     summary: Create a bearer token and refresh token.
+   *     security: []
    *     requestBody:
    *       required: true
    *       content:
@@ -75,16 +90,25 @@ export async function registerRoutes(
       params.append("client_secret", input.client_secret);
       if (input.username) params.append("username", input.username);
       if (input.password) params.append("password", input.password);
-      if (input.scope) params.append("scope", input.scope);
+      if (input.scope) params.append("scope", input.scope); // Use scope from request if provided
+      if (!input.scope && input.grant_type === "password") params.append("scope", "openid");
       if (input.refresh_token) params.append("refresh_token", input.refresh_token);
 
-      const uwmRes = await fetch("https://localhost:9000/adfs/oauth2/token", {
+      const uwmRes = await fetch("https://stg.api.uwm.com/adfs/oauth2/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: params.toString(),
       });
 
-      const data = await uwmRes.json();
+      const text = await uwmRes.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("Non-JSON response from UWM auth:", text);
+        return res.status(502).json({ error: "bad_gateway", error_description: "UWM returned non-JSON response" });
+      }
+
       if (!uwmRes.ok) {
         return res.status(uwmRes.status).json(data);
       }
@@ -123,16 +147,29 @@ export async function registerRoutes(
   app.post(api.layouts.mortgage.path, async (req, res) => {
     // Verify header (simple check)
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("BEARER ")) {
-       // Note: In a real app we'd return 401, but keeping logic consistent with mock
-       // For strict compliance with shared/routes:
+    if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
        return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const response: z.infer<typeof layoutResponseSchema> = {
-      priceQuoteFilterItems: [] // Returning empty list as per Python stub
-    };
-    res.json(response);
+    try {
+      const uwmRes = await fetch("https://stg.api.uwm.com/instantpricequote/v1/mortgagepricinglayout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": authHeader,
+        },
+        body: JSON.stringify(req.body),
+      });
+
+      const data = await uwmRes.json();
+      if (!uwmRes.ok) {
+        return res.status(uwmRes.status).json(data);
+      }
+      res.json(data);
+    } catch (err) {
+      console.error("Mortgage layout proxy error:", err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   });
 
   /**
@@ -158,13 +195,29 @@ export async function registerRoutes(
    */
   app.post(api.layouts.heloc.path, async (req, res) => {
      const authHeader = req.headers.authorization;
-     if (!authHeader || !authHeader.startsWith("BEARER ")) {
+     if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
         return res.status(401).json({ message: "Unauthorized" });
      }
-    const response: z.infer<typeof layoutResponseSchema> = {
-      priceQuoteFilterItems: []
-    };
-    res.json(response);
+
+     try {
+       const uwmRes = await fetch("https://stg.api.uwm.com/instantpricequote/v1/heloclayout", {
+         method: "POST",
+         headers: {
+           "Content-Type": "application/json",
+           "Authorization": authHeader,
+         },
+         body: JSON.stringify(req.body),
+       });
+
+       const data = await uwmRes.json();
+       if (!uwmRes.ok) {
+         return res.status(uwmRes.status).json(data);
+       }
+       res.json(data);
+     } catch (err) {
+       console.error("HELOC layout proxy error:", err);
+       res.status(500).json({ message: "Internal Server Error" });
+     }
   });
 
   /**
@@ -247,7 +300,7 @@ export async function registerRoutes(
       const input = api.quotes.mortgage.input.parse(req.body);
 
       // Proxy to UWM via tunnel
-      const uwmRes = await fetch("https://localhost:9000/api/uwm/instantpricequote/v1/mortgagepricingquote", {
+      const uwmRes = await fetch("https://stg.api.uwm.com/instantpricequote/v1/pricequote", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -326,7 +379,7 @@ export async function registerRoutes(
       const input = api.quotes.heloc.input.parse(req.body);
 
       // Proxy to UWM via tunnel
-      const uwmRes = await fetch("https://localhost:9000/api/uwm/instantpricequote/v1/helocquote", {
+      const uwmRes = await fetch("https://stg.api.uwm.com/instantpricequote/v1/helocquote", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -372,7 +425,7 @@ export async function registerRoutes(
    */
   app.get(api.scenarios.list.path, async (req, res) => {
     const authHeader = req.headers.authorization;
-     if (!authHeader || !authHeader.startsWith("BEARER ")) {
+     if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
         return res.status(401).json({ message: "Unauthorized" });
      }
     const scenarios = await storage.getScenarios();
@@ -397,7 +450,7 @@ export async function registerRoutes(
    */
   app.get(api.scenarios.get.path, async (req, res) => {
     const authHeader = req.headers.authorization;
-     if (!authHeader || !authHeader.startsWith("BEARER ")) {
+     if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
         return res.status(401).json({ message: "Unauthorized" });
      }
     const scenario = await storage.getScenario(Number(req.params.id));
@@ -425,7 +478,7 @@ export async function registerRoutes(
    */
   app.delete(api.scenarios.delete.path, async (req, res) => {
     const authHeader = req.headers.authorization;
-     if (!authHeader || !authHeader.startsWith("BEARER ")) {
+     if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
         return res.status(401).json({ message: "Unauthorized" });
      }
     await storage.deleteScenario(Number(req.params.id));

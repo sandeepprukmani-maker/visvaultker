@@ -53,9 +53,9 @@ export default function Home() {
                 <div className="p-4 bg-slate-50 rounded-lg text-sm text-left border mb-4">
                   <p className="font-semibold mb-1 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-green-600" />
-                    Demo Credentials
+                    Staging Credentials
                   </p>
-                  <p className="text-muted-foreground">This is a simulation. Click below to generate a session token.</p>
+                  <p className="text-muted-foreground">Using UWM staging credentials for instant pricing.</p>
                 </div>
 
                 <Button 

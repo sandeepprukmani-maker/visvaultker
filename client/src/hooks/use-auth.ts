@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type TokenRequest } from "@shared/routes";
+import { api } from "@shared/routes";
+import { type TokenRequest } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 // Simple local storage management for demo auth
@@ -14,11 +15,12 @@ export function useAuth() {
       // but in this demo we'll use the provided endpoint structure.
       // Since it's a mock, we construct a valid request payload.
       const payload: TokenRequest = {
-        grant_type: "password", // or client_credentials
-        client_id: "demo-client",
-        client_secret: "demo-secret",
-        username: credentials.username || "demo",
-        password: credentials.password || "demo",
+        grant_type: "password", 
+        client_id: credentials.client_id || "https://186005e7-4960-4e30-84e0-dd78a23e2b94",
+        client_secret: credentials.client_secret || "E4xSonoGqUbghJikHNkcXysn-NNArbc4nD4j3o94",
+        username: credentials.username || "qa.apiuser@karthikmortgage.com",
+        password: credentials.password || "MortgageStar1$$",
+        scope: "openid",
         ...credentials
       };
 
